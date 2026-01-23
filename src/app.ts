@@ -3,15 +3,20 @@ import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import prismaPlugin from "./plugins/prisma.js";
 import swaggerPlugin from "./plugins/swagger.js";
-
+import sessionPlugin from "./plugins/session.js";      
+import authRoutes from "./modules/auth/routes.js";   
 
 export default function buildApp() {
   const app = Fastify({ logger: true });
 
   app.register(cors, { origin: true, credentials: true });
-  app.register(cookie);
+
+
   app.register(prismaPlugin);
-app.register(swaggerPlugin);
+  app.register(sessionPlugin);  
+  app.register(swaggerPlugin);  
+
+  app.register(authRoutes); 
 
   app.get("/health", async () => ({ ok: true }));
 
