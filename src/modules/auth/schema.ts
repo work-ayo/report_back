@@ -43,10 +43,10 @@ export const loginSchema = {
   consumes: ["application/x-www-form-urlencoded"],
   body: {
     type: "object",
-    required: ["username", "password"],
+    required: ["id", "password"],
     additionalProperties: false,
     properties: {
-      username: { type: "string" },
+      id: { type: "string" },
       password: { type: "string", minLength: 8, maxLength: 72 },
     },
   
@@ -59,7 +59,7 @@ export const loginSchema = {
           type: "object",
           properties: {
             id: { type: "string" },
-            username: { type: "string" },
+            name: { type: "string" },
             name: { type: "string" },
             department: { type: ["string", "null"] },
             globalRole: { type: "string" },

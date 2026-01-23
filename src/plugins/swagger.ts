@@ -10,6 +10,15 @@ const swaggerPlugin: FastifyPluginAsync = async (app) => {
         title: "Task Tool API",
         version: "0.1.0",
       },
+        components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+      },
+    },
+  },
     },
   });
 

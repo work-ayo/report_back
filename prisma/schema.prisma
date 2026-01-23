@@ -19,31 +19,38 @@ enum TeamRole {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  username     String     @unique
-  passwordHash String
-  name         String
-  department   String?    @db.VarChar(100)
+  // DB PK (해시/랜덤)
+  userId     String     @id @default(cuid())
 
-  globalRole   GlobalRole @default(USER)
+  // 로그인용 아이디 
+  id         String     @unique
 
-  isActive     Boolean    @default(true)
-  lastLoginAt  DateTime?
+  // 비밀번호
+  password   String
 
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  // 표시 이름
+  name       String
+  department String?    @db.VarChar(100)
+
+  globalRole GlobalRole @default(USER)
+
+  isActive   Boolean    @default(true)
+  lastLoginAt DateTime?
+
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   memberships  TeamMember[]
   createdTeams Team[]     @relation("TeamCreator")
 }
 
 model Team {
-  id        String   @id @default(cuid())
-  name      String
-  joinCode  String   @unique
+  teamId   String   @id @default(cuid())
+  name     String
+  joinCode String   @unique
 
   createdByUserId String?
-  createdBy       User?    @relation("TeamCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdBy       User?    @relation("TeamCreator", fields: [createdByUserId], references: [userId], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -58,8 +65,8 @@ model TeamMember {
   role      TeamRole @default(MEMBER)
   joinedAt  DateTime @default(now())
 
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@unique([teamId, userId])
   @@index([userId])
