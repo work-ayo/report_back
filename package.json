@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
@@ -16,13 +17,19 @@
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",
-    "@prisma/client": "^7.3.0",
+    "@fastify/session": "^11.1.1",
+    "@fastify/swagger": "^9.6.1",
+    "@fastify/swagger-ui": "^5.2.4",
+    "@prisma/client": "^6.19.2",
+    "argon2": "^0.44.0",
+    "dotenv": "^17.2.3",
     "fastify": "^5.7.1",
-    "prisma": "^7.3.0",
+    "fastify-plugin": "^5.1.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^25.0.10",
+    "prisma": "^6.19.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

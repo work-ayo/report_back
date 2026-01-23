@@ -1,14 +1,67 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// prisma/schema.prisma
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GlobalRole {
+  ADMIN
+  USER
+}
+
+enum TeamRole {
+  MEMBER
+}
+
+model User {
+  id           String     @id @default(cuid())
+  username     String     @unique
+  passwordHash String
+  name         String
+  department   String?    @db.VarChar(100)
+
+  globalRole   GlobalRole @default(USER)
+
+  isActive     Boolean    @default(true)
+  lastLoginAt  DateTime?
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  memberships  TeamMember[]
+  createdTeams Team[]     @relation("TeamCreator")
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  joinCode  String   @unique
+
+  createdByUserId String?
+  createdBy       User?    @relation("TeamCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   TeamMember[]
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String
+  role      TeamRole @default(MEMBER)
+  joinedAt  DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@index([teamId])
 }
