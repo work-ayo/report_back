@@ -5,6 +5,7 @@ import prismaPlugin from "./plugins/prisma.js";
 import swaggerPlugin from "./plugins/swagger.js";
 import sessionPlugin from "./plugins/session.js";      
 import authRoutes from "./modules/auth/routes.js";   
+import formbody from "@fastify/formbody";
 
 export default function buildApp() {
   const app = Fastify({ logger: true });
@@ -15,6 +16,8 @@ export default function buildApp() {
   app.register(prismaPlugin);
   app.register(sessionPlugin);  
   app.register(swaggerPlugin);  
+app.register(formbody);
+
 
   app.register(authRoutes); 
 

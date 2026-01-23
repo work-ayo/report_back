@@ -1,16 +1,18 @@
 export const signupSchema = {
   tags: ["auth"],
   summary: "회원가입",
+  consumes: ["application/x-www-form-urlencoded"],
   body: {
     type: "object",
-    required: ["username", "password", "name"],
+    required: ["id", "password", "name"],
     additionalProperties: false,
     properties: {
-      username: { type: "string", minLength: 3, maxLength: 30 },
+      id: { type: "string", minLength: 3, maxLength: 30 },
       password: { type: "string", minLength: 8, maxLength: 72 },
       name: { type: "string", minLength: 1, maxLength: 50 },
       department: { type: "string", maxLength: 100 },
     },
+
   },
   response: {
     201: {
@@ -38,6 +40,7 @@ export const signupSchema = {
 export const loginSchema = {
   tags: ["auth"],
   summary: "로그인",
+  consumes: ["application/x-www-form-urlencoded"],
   body: {
     type: "object",
     required: ["username", "password"],
@@ -46,6 +49,7 @@ export const loginSchema = {
       username: { type: "string" },
       password: { type: "string", minLength: 8, maxLength: 72 },
     },
+  
   },
   response: {
     200: {
@@ -69,6 +73,7 @@ export const loginSchema = {
     401: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
   },
 };
+
 
 export const meSchema = {
   tags: ["auth"],
