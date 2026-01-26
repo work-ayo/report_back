@@ -7,30 +7,30 @@ export const signupSchema = {
     required: ["id", "password", "name"],
     additionalProperties: false,
     properties: {
-      id: { type: "string", minLength: 3, maxLength: 30 },
-      password: { type: "string", minLength: 8, maxLength: 72 },
-      name: { type: "string", minLength: 1, maxLength: 50 },
-      department: { type: "string", maxLength: 100 },
+      id: { type: "string", minLength: 3, maxLength: 30 ,default:""},
+      password: { type: "string", minLength: 8, maxLength: 72,default:"" },
+      name: { type: "string", minLength: 1, maxLength: 50 ,default:""},
+      department: { type: "string", maxLength: 100,default:"" },
     },
-
   },
   response: {
     201: {
       type: "object",
+      required: ["accessToken", "user"],
       properties: {
+        accessToken: { type: "string" },
         user: {
           type: "object",
+          required: ["userId", "id", "name", "department", "globalRole"],
           properties: {
+            userId: { type: "string" },
             id: { type: "string" },
-            username: { type: "string" },
             name: { type: "string" },
             department: { type: ["string", "null"] },
             globalRole: { type: "string" },
           },
-          required: ["id", "username", "name", "department", "globalRole"],
         },
       },
-      required: ["user"],
     },
     400: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
     409: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
@@ -46,28 +46,28 @@ export const loginSchema = {
     required: ["id", "password"],
     additionalProperties: false,
     properties: {
-      id: { type: "string" },
-      password: { type: "string", minLength: 8, maxLength: 72 },
+      id: { type: "string", default: "" },
+      password: { type: "string", minLength: 8, maxLength: 72, default: "" },
     },
-  
   },
   response: {
     200: {
       type: "object",
+      required: ["accessToken", "user"],
       properties: {
+        accessToken: { type: "string" },
         user: {
           type: "object",
+          required: ["userId", "id", "name", "department", "globalRole"],
           properties: {
+            userId: { type: "string" },
             id: { type: "string" },
-            name: { type: "string" },
             name: { type: "string" },
             department: { type: ["string", "null"] },
             globalRole: { type: "string" },
           },
-          required: ["id", "username", "name", "department", "globalRole"],
         },
       },
-      required: ["user"],
     },
     400: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
     401: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
@@ -78,26 +78,21 @@ export const loginSchema = {
 export const meSchema = {
   tags: ["auth"],
   summary: "내 정보",
+  security: [{ bearerAuth: [] }], 
   response: {
     200: {
       type: "object",
       properties: {
-        user: {
-          anyOf: [
-            { type: "null" },
-            {
-              type: "object",
-              properties: {
-                id: { type: "string" },
-                username: { type: "string" },
-                name: { type: "string" },
-                department: { type: ["string", "null"] },
-                globalRole: { type: "string" },
-                isActive: { type: "boolean" },
-              },
-              required: ["id", "username", "name", "department", "globalRole", "isActive"],
-            },
-          ],
+   user: {
+          type: "object",
+          required: ["userId", "id", "name", "department", "globalRole"],
+          properties: {
+            userId: { type: "string" },
+            id: { type: "string" },
+            name: { type: "string" },
+            department: { type: ["string", "null"] },
+            globalRole: { type: "string" },
+          },
         },
       },
       required: ["user"],
@@ -110,14 +105,4 @@ export const meSchema = {
   },
 };
 
-export const logoutSchema = {
-  tags: ["auth"],
-  summary: "로그아웃",
-  response: {
-    200: {
-      type: "object",
-      properties: { ok: { type: "boolean" } },
-      required: ["ok"],
-    },
-  },
-};
+

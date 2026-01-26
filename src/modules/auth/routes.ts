@@ -1,12 +1,20 @@
+// src/modules/auth/routes.ts
 import type { FastifyPluginAsync } from "fastify";
 import argon2 from "argon2";
+import {
+  signupSchema,
+  loginSchema,
+  meSchema,
+} from "./schema.js";
+
+const base = "/auth";
 
 const authRoutes: FastifyPluginAsync = async (app) => {
   // 회원가입
-  app.post("/auth/signup", async (req, reply) => {
+  app.post(`${base}/signup`, { schema: signupSchema }, async (req, reply) => {
     const body = req.body as {
-      id: string;         // 로그인 아이디
-      password: string;   // 평문 입력
+      id: string; // 로그인 아이디
+      password: string; // 평문 입력
       name: string;
       department?: string;
     };
@@ -27,7 +35,7 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     const user = await app.prisma.user.create({
       data: {
         id,
-        password: hashed, // 컬럼명은 password지만 해시 저장
+        password: hashed,
         name,
         department: body.department?.trim() || null,
       },
@@ -40,7 +48,7 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // 로그인
-  app.post("/auth/login", async (req, reply) => {
+  app.post(`${base}/login`, { schema: loginSchema }, async (req, reply) => {
     const body = req.body as { id: string; password: string };
 
     const id = body.id?.trim();
@@ -74,23 +82,31 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // 내 정보 (JWT 필요)
-  app.get("/auth/me", { preHandler: (app as any).authenticate }, async (req: any, reply) => {
-    const userId = req.user?.sub as string;
+  app.get(
+   `${base}/me`,
+    { preHandler: (app as any).authenticate, schema: meSchema },
+    async (req: any, reply) => {
+      const userId = req.user?.sub as string;
 
-    const user = await app.prisma.user.findUnique({
-      where: { userId },
-      select: { userId: true, id: true, name: true, department: true, globalRole: true, isActive: true },
-    });
+      const user = await app.prisma.user.findUnique({
+        where: { userId },
+        select: {
+          userId: true,
+          id: true,
+          name: true,
+          department: true,
+          globalRole: true,
+          isActive: true,
+        },
+      });
 
-    if (!user || !user.isActive) return reply.code(401).send({ error: "unauthorized" });
+      if (!user || !user.isActive) return reply.code(401).send({ error: "unauthorized" });
 
-    return reply.send({ user });
-  });
+      return reply.send({ user });
+    }
+  );
 
-  // 로그아웃 (JWT는 기본적으로 서버가 할 게 없음)
-  app.post("/auth/logout", async (_req, reply) => {
-    return reply.send({ ok: true });
-  });
+
 };
 
 export default authRoutes;

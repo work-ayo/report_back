@@ -10,20 +10,23 @@ const swaggerPlugin: FastifyPluginAsync = async (app) => {
         title: "Task Tool API",
         version: "0.1.0",
       },
-        components: {
-    securitySchemes: {
-      bearerAuth: {
-        type: "http",
-        scheme: "bearer",
-        bearerFormat: "JWT",
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+          },
+        },
       },
-    },
-  },
     },
   });
 
   await app.register(swaggerUI, {
     routePrefix: "/docs",
+    uiConfig: {
+      persistAuthorization: true,
+    },
   });
 };
 
