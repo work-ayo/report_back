@@ -5,9 +5,14 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminId = process.env.ADMIN_ID || "admin";
-  const adminName = process.env.ADMIN_NAME || "Administrator";
-  const adminPassword = process.env.ADMIN_PASSWORD || "ChangeMe1234!";
+  const adminId = process.env.ADMIN_ID;
+  const adminName = process.env.ADMIN_NAME;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (!adminId || !adminName || !adminPassword) {
+    console.error("check admin information!");
+    return;
+  }
 
   const exists = await prisma.user.findUnique({ where: { id: adminId } });
 
@@ -17,7 +22,7 @@ async function main() {
     await prisma.user.create({
       data: {
         id: adminId,
-        password: hashed,      // 컬럼명 password(해시 저장)
+        password: hashed,
         name: adminName,
         globalRole: "ADMIN",
         isActive: true,
@@ -31,6 +36,10 @@ async function main() {
 }
 
 main()
+  .catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  })
   .finally(async () => {
     await prisma.$disconnect();
   });

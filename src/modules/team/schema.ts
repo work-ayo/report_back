@@ -26,3 +26,29 @@ export const joinTeamSchema = {
     409: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
   },
 };
+
+export const getMyTeamsSchema = {
+  tags: ["team"],
+  summary: "내가 속한 팀 목록",
+  security: [{ bearerAuth: [] }],
+  response: {
+    200: {
+      type: "object",
+      required: ["teams"],
+      properties: {
+        teams: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["teamId", "name", "joinCode"],
+            properties: {
+              teamId: { type: "string" },
+              name: { type: "string" },
+              joinCode: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+  },
+};

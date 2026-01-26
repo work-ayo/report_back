@@ -1,11 +1,12 @@
 import type { FastifyPluginAsync } from "fastify";
-import { joinTeamSchema } from "./schema.js";
 import { requireAuth } from "../../common/middleware/auth.js";
+import { joinTeamSchema, getMyTeamsSchema } from "./schema.js";
 
-const base ="/teams"
+const base = "/teams"
 const teamRoutes: FastifyPluginAsync = async (app) => {
-  // 팀 참가 (JWT 사용자)
-  app.post(`${base}/join`,
+  // 팀 참가
+  app.post(
+    `${base}/join`,
     { preHandler: [requireAuth], schema: joinTeamSchema },
     async (req: any, reply) => {
       const userId = req.user?.sub as string;
@@ -27,14 +28,30 @@ const teamRoutes: FastifyPluginAsync = async (app) => {
       if (exists) return reply.code(409).send({ code: "ALREADY_JOINED", message: "already joined" });
 
       await app.prisma.teamMember.create({
-        data: {
-          teamId: team.teamId,
-          userId,
-          role: "MEMBER",
-        },
+        data: { teamId: team.teamId, userId, role: "MEMBER" },
       });
 
       return reply.send({ ok: true, teamId: team.teamId });
+    }
+  );
+
+  // 내가 속한 팀 목록
+  app.get(
+    `${base}/me`,
+    { preHandler: [requireAuth], schema: getMyTeamsSchema },
+    async (req: any, reply) => {
+      const userId = req.user?.sub as string;
+
+      const memberships = await app.prisma.teamMember.findMany({
+        where: { userId },
+        select: {
+          team: { select: { teamId: true, name: true, joinCode: true } },
+        },
+        orderBy: { joinedAt: "asc" },
+      });
+
+      const teams = memberships.map((m) => m.team);
+      return reply.send({ teams });
     }
   );
 };

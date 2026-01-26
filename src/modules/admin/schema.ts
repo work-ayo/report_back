@@ -13,15 +13,14 @@ export const adminCreateUserSchema = {
       department: { type: "string", maxLength: 100, default: "" },
       globalRole: { type: "string", enum: ["ADMIN", "USER"], default: "USER" },
       // 비번을 특정 값으로 지정하고 싶으면 선택적으로 허용
-      password: { type: "string", minLength: 8, maxLength: 72, default: "" },
+      password: { type: "string", maxLength: 72, default: "" },
     },
   },
   response: {
     201: {
       type: "object",
-      required: ["user", "defaultPassword"],
+      required: ["user"],
       properties: {
-        defaultPassword: { type: "string" }, // 실제 발급된 비번(입력 없으면 env 기본값)
         user: {
           type: "object",
           required: ["userId", "id", "name", "department", "globalRole"],
@@ -42,64 +41,6 @@ export const adminCreateUserSchema = {
   },
 };
 
-
-export const adminCreateTeamSchema = {
-  tags: ["admin"],
-  summary: "팀 생성 (ADMIN)",
-  consumes: ["application/x-www-form-urlencoded"],
-  security: [{ bearerAuth: [] }],
-  body: {
-    type: "object",
-    required: ["name"],
-    additionalProperties: false,
-    properties: {
-      name: { type: "string", minLength: 1, maxLength: 50, default: "" },
-    },
-  },
-  response: {
-    201: {
-      type: "object",
-      required: ["team"],
-      properties: {
-        team: {
-          type: "object",
-          required: ["teamId", "name", "joinCode"],
-          properties: {
-            teamId: { type: "string" },
-            name: { type: "string" },
-            joinCode: { type: "string" },
-          },
-        },
-      },
-    },
-    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-  },
-};
-
-export const adminDeleteTeamSchema = {
-  tags: ["admin"],
-  summary: "팀 삭제 (ADMIN)",
-  security: [{ bearerAuth: [] }],
-  params: {
-    type: "object",
-    required: ["teamId"],
-    properties: {
-      teamId: { type: "string" },
-    },
-  },
-  response: {
-    200: {
-      type: "object",
-      required: ["ok"],
-      properties: { ok: { type: "boolean" } },
-    },
-    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-  },
-};
 
 export const adminSetUserRoleSchema = {
   tags: ["admin"],
@@ -214,3 +155,205 @@ export const adminResetPasswordSchema = {
   },
 };
 
+export const adminDeleteUserSchema = {
+  tags: ["admin"],
+  summary: "유저 삭제 (ADMIN)",
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: "object",
+    required: ["userId"],
+    properties: {
+      userId: { type: "string" },
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      required: ["ok"],
+      properties: { ok: { type: "boolean" } },
+    },
+    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+  },
+};
+
+
+
+export const adminCreateTeamSchema = {
+  tags: ["admin/teams"],
+  summary: "팀 생성 (ADMIN)",
+  consumes: ["application/x-www-form-urlencoded"],
+  security: [{ bearerAuth: [] }],
+  body: {
+    type: "object",
+    required: ["name"],
+    additionalProperties: false,
+    properties: {
+      name: { type: "string", minLength: 1, maxLength: 50, default: "" },
+    },
+  },
+  response: {
+    201: {
+      type: "object",
+      required: ["team"],
+      properties: {
+        team: {
+          type: "object",
+          required: ["teamId", "name", "joinCode"],
+          properties: {
+            teamId: { type: "string" },
+            name: { type: "string" },
+            joinCode: { type: "string" },
+          },
+        },
+      },
+    },
+    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+  },
+};
+
+export const adminDeleteTeamSchema = {
+  tags: ["admin/teams"],
+  summary: "팀 삭제 (ADMIN)",
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: "object",
+    required: ["teamId"],
+    properties: {
+      teamId: { type: "string" },
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      required: ["ok"],
+      properties: { ok: { type: "boolean" } },
+    },
+    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+  },
+};
+
+export const adminAddTeamMemberSchema = {
+  tags: ["admin/teams"],
+  summary: "팀에 유저 추가 (ADMIN)",
+  consumes: ["application/x-www-form-urlencoded"],
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: "object",
+    required: ["teamId"],
+    properties: { teamId: { type: "string" } },
+  },
+  body: {
+    type: "object",
+    required: ["userId"],
+    additionalProperties: false,
+    properties: {
+      userId: { type: "string", default: "" },
+      role: { type: "string", enum: ["MEMBER"], default: "MEMBER" }, // 지금은 MEMBER만
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      required: ["ok", "teamId", "userId"],
+      properties: {
+        ok: { type: "boolean" },
+        teamId: { type: "string" },
+        userId: { type: "string" },
+      },
+    },
+    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    409: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+  },
+};
+
+export const adminRemoveTeamMemberSchema = {
+  tags: ["admin/teams"],
+  summary: "팀에서 탈퇴 (ADMIN)",
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: "object",
+    required: ["teamId", "userId"],
+    properties: {
+      teamId: { type: "string" },
+      userId: { type: "string" },
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      required: ["ok"],
+      properties: { ok: { type: "boolean" } },
+    },
+    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+  },
+};
+
+
+export const adminListTeamsSchema = {
+  tags: ["admin/teams"],
+  summary: "팀 목록 조회 (ADMIN)",
+  security: [{ bearerAuth: [] }],
+  response: {
+    200: {
+      type: "object",
+      required: ["teams"],
+      properties: {
+        teams: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["teamId", "name", "joinCode"],
+            properties: {
+              teamId: { type: "string" },
+              name: { type: "string" },
+              joinCode: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+export const adminListTeamMembersSchema = {
+  tags: ["admin/teams"],
+  summary: "팀 멤버 목록 조회 (ADMIN)",
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: "object",
+    required: ["teamId"],
+    properties: { teamId: { type: "string" } },
+  },
+  response: {
+    200: {
+      type: "object",
+      required: ["members"],
+      properties: {
+        members: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["userId", "id", "name", "department", "globalRole", "role", "isActive"],
+            properties: {
+              userId: { type: "string" },
+              id: { type: "string" },
+              name: { type: "string" },
+              department: { type: ["string", "null"] },
+              globalRole: { type: "string" },
+              role: { type: "string" }, // TeamRole
+              isActive: { type: "boolean" },
+            },
+          },
+        },
+      },
+    },
+    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+  },
+};
