@@ -20,50 +20,52 @@ enum TeamRole {
 
 model User {
   // DB PK (해시/랜덤)
-  userId     String     @id @default(cuid())
+  userId String @id @default(cuid())
 
   // 로그인용 아이디 
-  id         String     @unique
+  id String @unique
 
   // 비밀번호
-  password   String
+  password String
 
   // 표시 이름
   name       String
-  department String?    @db.VarChar(100)
+  department String? @db.VarChar(100)
 
   globalRole GlobalRole @default(USER)
 
-  isActive   Boolean    @default(true)
+  isActive    Boolean   @default(true)
   lastLoginAt DateTime?
-
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-
-  memberships  TeamMember[]
-  createdTeams Team[]     @relation("TeamCreator")
-}
-
-model Team {
-  teamId   String   @id @default(cuid())
-  name     String
-  joinCode String   @unique
-
-  createdByUserId String?
-  createdBy       User?    @relation("TeamCreator", fields: [createdByUserId], references: [userId], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members   TeamMember[]
+  memberships  TeamMember[]
+  createdTeams Team[]  @relation("TeamCreator")
+  reports      WeeklyReport[]
+}
+
+model Team {
+  teamId   String @id @default(cuid())
+  name     String
+  joinCode String @unique
+
+  createdByUserId String?
+  createdBy       User?   @relation("TeamCreator", fields: [createdByUserId], references: [userId], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members TeamMember[]
+  reports WeeklyReport[]
 }
 
 model TeamMember {
-  id        String   @id @default(cuid())
-  teamId    String
-  userId    String
-  role      TeamRole @default(MEMBER)
-  joinedAt  DateTime @default(now())
+  id       String   @id @default(cuid())
+  teamId   String
+  userId   String
+  role     TeamRole @default(MEMBER)
+  joinedAt DateTime @default(now())
 
   team Team @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
   user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
@@ -71,4 +73,28 @@ model TeamMember {
   @@unique([teamId, userId])
   @@index([userId])
   @@index([teamId])
+}
+
+model WeeklyReport {
+  reportId  String   @id @default(cuid())
+  teamId    String
+  userId    String
+
+  // 주의 월요일 00:00(UTC) 기준
+  weekStart DateTime
+
+  thisWeek  String   @db.Text
+  nextWeek  String   @db.Text
+  issue     String?  @db.Text
+  solution  String?  @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team Team @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([teamId, userId, weekStart])
+  @@index([userId, weekStart])
+  @@index([teamId, weekStart])
 }

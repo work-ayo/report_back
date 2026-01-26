@@ -6,7 +6,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 export async function requireAuth(req: FastifyRequest, reply: FastifyReply) {
   // req.server === fastify instance
   // authenticate는 jwtPlugin에서 decorate한 함수
-  // eslint / TS 타입 불편해서 any 처리
+
   const app = req.server as any;
   return app.authenticate(req, reply);
 }

@@ -105,4 +105,27 @@ export const meSchema = {
   },
 };
 
-
+export const changePasswordSchema = {
+  tags: ["auth"],
+  summary: "비밀번호 변경",
+  security: [{ bearerAuth: [] }],
+  consumes: ["application/x-www-form-urlencoded"],
+  body: {
+    type: "object",
+    required: ["password", "newPassword"],
+    additionalProperties: false,
+    properties: {
+      password: { type: "string", minLength: 8, maxLength: 72, default: "" },
+      newPassword: { type: "string", minLength: 8, maxLength: 72, default: "" },
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      required: ["ok"],
+      properties: { ok: { type: "boolean" } },
+    },
+    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+  },
+};

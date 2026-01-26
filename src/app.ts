@@ -11,12 +11,12 @@ import { AppError } from "./common/errors.js";
 import authRoutes from "./modules/auth/routes.js";
 import teamRoutes from "./modules/team/routes.js";
 import adminRoutes from "./modules/admin/routes.js";
+import weeklyRoutes from "./modules/weekly/routes.js";
 
 export default function buildApp() {
   const app = Fastify({
     disableRequestLogging: true,
     logger: {
-      level: "info",
       transport:
         process.env.NODE_ENV !== "production"
           ? {
@@ -32,28 +32,28 @@ export default function buildApp() {
     },
   });
 
-  // 요청 로그(필요한 것만)
-  app.addHook("onResponse", async (req, reply) => {
-    const url = req.url;
+    // 요청 로그(필요한 것만)
+app.addHook("onResponse", async (req, reply) => {
+  const url = req.url;
 
-    if (
-      url.startsWith("/docs") ||
-      url.startsWith("/health") ||
-      url.startsWith("/favicon")
-    ) {
-      return;
-    }
+  if (
+    url.startsWith("/docs") ||
+    url.startsWith("/health") ||
+    url.startsWith("/favicon")
+  ) {
+    return;
+  }
 
-    req.log.info(
-      {
-        method: req.method,
-        url,
-        statusCode: reply.statusCode,
-        userId: (req as any).user?.sub,
-      },
-      "request"
-    );
-  });
+  const status = reply.statusCode;
+  const userId = (req as any).user?.sub as string | undefined;
+
+  const msg = userId
+    ? `${req.method} ${url} -> ${status} (user=${userId})`
+    : `${req.method} ${url} -> ${status}`;
+
+  req.log.info(msg);
+});
+
 
   //전역 에러 핸들러 (응답 + 로그 통일)
   app.setErrorHandler((err, req, reply) => {
@@ -100,6 +100,7 @@ export default function buildApp() {
   app.register(adminRoutes);
   app.register(authRoutes);
   app.register(teamRoutes);
+  app.register(weeklyRoutes);
 
 
   app.get("/health", async () => ({ ok: true }));

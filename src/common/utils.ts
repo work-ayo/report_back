@@ -5,3 +5,30 @@ export function randomJoinCode(len = 8) {
   for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
   return out;
 }
+
+// YYYY-MM-DD -> Date(UTC midnight)
+export function parseYmdToUtcDate(ymd: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) throw new Error("INVALID_DATE");
+  const y = Number(m[1]);
+  const mo = Number(m[2]) - 1;
+  const d = Number(m[3]);
+  return new Date(Date.UTC(y, mo, d, 0, 0, 0, 0));
+}
+
+// 해당 날짜가 속한 주의 "월요일 00:00(UTC)"로 정규화
+export function toWeekStartUtc(d: Date): Date {
+  const day = d.getUTCDay(); // 0=Sun..6=Sat
+  const diffToMon = (day + 6) % 7; // Mon=0, Tue=1 ... Sun=6
+  const out = new Date(d);
+  out.setUTCDate(out.getUTCDate() - diffToMon);
+  out.setUTCHours(0, 0, 0, 0);
+  return out;
+}
+
+export function toYmd(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}

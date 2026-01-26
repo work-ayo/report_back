@@ -29,10 +29,47 @@ async function main() {
       },
     });
 
+
+
     console.log("Admin created:", adminId);
   } else {
     console.log("Admin already exists:", adminId);
   }
+}
+
+async function createTester(){
+  const id = "user";
+  const name = "user";
+  const pw = "user1234";
+
+  if (!id || !name || !pw) {
+    console.error("check user information!");
+    return;
+  }
+
+  const exists = await prisma.user.findUnique({ where: { id: id } });
+
+  if (!exists) {
+    const hashed = await argon2.hash(pw);
+
+    await prisma.user.create({
+      data: {
+        id: id,
+        password: hashed,
+        name: name,
+        globalRole: "USER",
+        isActive: true,
+      },
+    });
+
+
+
+    console.log("user created:", id);
+  } else {
+    console.log("user already exists:", id);
+  }
+
+  
 }
 
 main()
