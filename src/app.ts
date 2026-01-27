@@ -13,6 +13,8 @@ import teamRoutes from "./modules/team/routes.js";
 import adminRoutes from "./modules/admin/routes.js";
 import weeklyRoutes from "./modules/weekly/routes.js";
 import adminTeamRoutes from "./modules/admin/teams/routes.js";
+import boardRoutes from "./modules/board/routes.js";
+import cardRoutes from "./modules/card/routes.js";
 
 export default function buildApp() {
   const app = Fastify({
@@ -104,6 +106,8 @@ app.addHook("onResponse", async (req, reply) => {
   app.register(teamRoutes);
   app.register(weeklyRoutes);
 
+  app.register(boardRoutes);
+  app.register(cardRoutes);
 
   app.get("/health", async () => ({ ok: true }));
 

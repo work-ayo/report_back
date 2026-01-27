@@ -40,9 +40,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships  TeamMember[]
-  createdTeams Team[]  @relation("TeamCreator")
-  reports      WeeklyReport[]
+  memberships   TeamMember[]
+  createdTeams  Team[]         @relation("TeamCreator")
+  reports       WeeklyReport[]
+  boardsCreated Board[]
+  cardsCreated  Card[]         @relation("CardCreator")
 }
 
 model Team {
@@ -58,6 +60,7 @@ model Team {
 
   members TeamMember[]
   reports WeeklyReport[]
+  boards  Board[]
 }
 
 model TeamMember {
@@ -76,17 +79,17 @@ model TeamMember {
 }
 
 model WeeklyReport {
-  reportId  String   @id @default(cuid())
-  teamId    String
-  userId    String
+  reportId String @id @default(cuid())
+  teamId   String
+  userId   String
 
   // 주의 월요일 00:00(UTC) 기준
   weekStart DateTime
 
-  thisWeek  String   @db.Text
-  nextWeek  String   @db.Text
-  issue     String?  @db.Text
-  solution  String?  @db.Text
+  thisWeek String  @db.Text
+  nextWeek String  @db.Text
+  issue    String? @db.Text
+  solution String? @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -97,4 +100,70 @@ model WeeklyReport {
   @@unique([teamId, userId, weekStart])
   @@index([userId, weekStart])
   @@index([teamId, weekStart])
+}
+
+//kanban board
+enum ColumnStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CUSTOM
+}
+
+model Board {
+  boardId         String @id @default(cuid())
+  teamId          String
+  name            String
+  createdByUserId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team      Team @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
+  createdBy User @relation(fields: [createdByUserId], references: [userId], onDelete: Cascade)
+
+  columns Column[]
+  cards   Card[]
+
+  @@index([teamId])
+}
+
+model Column {
+  columnId String       @id @default(cuid())
+  boardId  String
+  name     String
+  status   ColumnStatus @default(CUSTOM)
+  order    Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board Board  @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  cards Card[]
+
+  @@unique([boardId, order])
+  @@index([boardId])
+}
+
+model Card {
+  cardId   String @id @default(cuid())
+  boardId  String
+  columnId String
+
+  title   String
+  content String? @db.Text
+  order   Int
+
+  createdByUserId String
+  createdBy       User   @relation("CardCreator", fields: [createdByUserId], references: [userId], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board  Board  @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  column Column @relation(fields: [columnId], references: [columnId], onDelete: Cascade)
+
+  @@unique([columnId, order])
+  @@index([boardId])
+  @@index([columnId])
 }
