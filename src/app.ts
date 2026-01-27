@@ -12,6 +12,7 @@ import authRoutes from "./modules/auth/routes.js";
 import teamRoutes from "./modules/team/routes.js";
 import adminRoutes from "./modules/admin/routes.js";
 import weeklyRoutes from "./modules/weekly/routes.js";
+import adminTeamRoutes from "./modules/admin/teams/routes.js";
 
 export default function buildApp() {
   const app = Fastify({
@@ -98,6 +99,7 @@ app.addHook("onResponse", async (req, reply) => {
 
   app.register(swaggerPlugin);
   app.register(adminRoutes);
+  app.register(adminTeamRoutes);
   app.register(authRoutes);
   app.register(teamRoutes);
   app.register(weeklyRoutes);

@@ -18,13 +18,14 @@ const jwtPlugin: FastifyPluginAsync = async (app) => {
     },
   });
 
-  app.decorate("authenticate", async (req: any, reply: any) => {
-    try {
-      await req.jwtVerify();
-    } catch {
-      return reply.code(401).send({ error: "unauthorized" });
-    }
-  });
+app.decorate("authenticate", async (req: any, reply: any) => {
+  try {
+    await req.jwtVerify();
+  } catch {
+    return reply.status(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
+  }
+});
+
 };
 
 export default fp(jwtPlugin);

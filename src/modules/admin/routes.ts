@@ -2,23 +2,16 @@ import type { FastifyPluginAsync } from "fastify";
 import argon2 from "argon2";
 import { env } from "../../../config/env.js";
 import { requireAuth, requireAdmin } from "../../common/middleware/auth.js";
-import { randomJoinCode } from "../../common/utils.js";
 import {
-  adminCreateTeamSchema,
-  adminDeleteTeamSchema,
   adminSetUserRoleSchema,
   adminCreateUserSchema,
   adminListUsersSchema,
   adminDeleteUserSchema,
   adminResetPasswordSchema,
-  adminAddTeamMemberSchema,
-  adminRemoveTeamMemberSchema,
-  adminListTeamMembersSchema,
-  adminListTeamsSchema
+
 } from "./schema.js";
 
 const base = "/admin";
-const team_base = `${base}/teams`;
 
 const adminRoutes: FastifyPluginAsync = async (app) => {
   const adminPreHandler = [requireAuth, requireAdmin(app)];
@@ -170,171 +163,6 @@ const adminRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 
-
-  // 팀 생성 (ADMIN)
-  app.post(
-    `${team_base}`,
-    { preHandler: adminPreHandler, schema: adminCreateTeamSchema },
-    async (req: any, reply) => {
-      const body = req.body as { name: string };
-      const name = body.name?.trim();
-      if (!name) return reply.code(400).send({ code: "NAME_REQUIRED", message: "name required" });
-
-      // joinCode 생성(충돌 시 재시도)
-      let joinCode = randomJoinCode(8);
-      for (let i = 0; i < 5; i++) {
-        const exists = await app.prisma.team.findUnique({ where: { joinCode } });
-        if (!exists) break;
-        joinCode = randomJoinCode(8);
-      }
-
-      const team = await app.prisma.team.create({
-        data: {
-          name,
-          joinCode,
-          createdByUserId: req.user.sub,
-        },
-        select: { teamId: true, name: true, joinCode: true },
-      });
-
-      return reply.code(201).send({ team });
-    }
-  );
-
-  // 팀 삭제 (ADMIN)
-  app.delete(
-    `${team_base}/:teamId`,
-    { preHandler: adminPreHandler, schema: adminDeleteTeamSchema },
-    async (req: any, reply) => {
-      const teamId = req.params.teamId as string;
-
-      const team = await app.prisma.team.findUnique({
-        where: { teamId },
-        select: { teamId: true },
-      });
-      if (!team) return reply.code(404).send({ code: "TEAM_NOT_FOUND", message: "team not found" });
-
-      await app.prisma.team.delete({ where: { teamId } });
-      return reply.send({ ok: true });
-    }
-  );
-  // 팀에 유저 추가 (ADMIN)
-app.post(
-  `${team_base}/:teamId/members`,
-  { preHandler: adminPreHandler, schema: adminAddTeamMemberSchema },
-  async (req: any, reply) => {
-    const teamId = req.params.teamId as string;
-    const body = req.body as { userId: string; role?: "MEMBER" };
-
-    const userId = body.userId?.trim();
-    if (!userId) return reply.code(400).send({ code: "USERID_REQUIRED", message: "userId required" });
-
-    // 팀 존재 확인
-    const team = await app.prisma.team.findUnique({ where: { teamId }, select: { teamId: true } });
-    if (!team) return reply.code(404).send({ code: "TEAM_NOT_FOUND", message: "team not found" });
-
-    // 유저 존재 확인
-    const user = await app.prisma.user.findUnique({ where: { userId }, select: { userId: true } });
-    if (!user) return reply.code(404).send({ code: "USER_NOT_FOUND", message: "user not found" });
-
-    // 이미 멤버면 409
-    const exists = await app.prisma.teamMember.findUnique({
-      where: { teamId_userId: { teamId, userId } },
-      select: { id: true },
-    });
-    if (exists) return reply.code(409).send({ code: "ALREADY_MEMBER", message: "already a member" });
-
-    await app.prisma.teamMember.create({
-      data: {
-        teamId,
-        userId,
-        role: "MEMBER",
-      },
-    });
-
-    return reply.send({ ok: true, teamId, userId });
-  }
-);
-
-// 팀에서 유저 제거 (ADMIN)
-app.delete(
-  `${team_base}/:teamId/members/:userId`,
-  { preHandler: adminPreHandler, schema: adminRemoveTeamMemberSchema },
-  async (req: any, reply) => {
-    const teamId = req.params.teamId as string;
-    const userId = req.params.userId as string;
-
-    const member = await app.prisma.teamMember.findUnique({
-      where: { teamId_userId: { teamId, userId } },
-      select: { id: true },
-    });
-    if (!member) return reply.code(404).send({ code: "MEMBER_NOT_FOUND", message: "member not found" });
-
-    await app.prisma.teamMember.delete({
-      where: { teamId_userId: { teamId, userId } },
-    });
-
-    return reply.send({ ok: true });
-  }
-);
-
-app.get(
-  `${team_base}`,
-  { preHandler: adminPreHandler, schema: adminListTeamsSchema },
-  async (_req: any, reply) => {
-    const teams = await app.prisma.team.findMany({
-      select: { teamId: true, name: true, joinCode: true },
-      orderBy: { createdAt: "asc" },
-    });
-
-    return reply.send({ teams });
-  }
-);
-
-//팀 멤버 목록 조회
-app.get(
-  `${team_base}:teamId/members`,
-  { preHandler: adminPreHandler, schema: adminListTeamMembersSchema },
-  async (req: any, reply) => {
-    const teamId = req.params.teamId as string;
-
-    const team = await app.prisma.team.findUnique({
-      where: { teamId },
-      select: { teamId: true },
-    });
-    if (!team) return reply.code(404).send({ code: "TEAM_NOT_FOUND", message: "team not found" });
-
-    const members = await app.prisma.teamMember.findMany({
-      where: { teamId },
-      select: {
-        role: true,
-        user: {
-          select: {
-            userId: true,
-            id: true,
-            name: true,
-            department: true,
-            globalRole: true,
-            isActive: true,
-          },
-        },
-      },
-      orderBy: { joinedAt: "asc" },
-    });
-
-    return reply.send({
-      members: members.map((m) => ({
-        role: m.role,
-        userId: m.user.userId,
-        id: m.user.id,
-        name: m.user.name,
-        department: m.user.department,
-        globalRole: m.user.globalRole,
-        isActive: m.user.isActive,
-      })),
-    });
-  }
-);
 
 
   // 유저 권한 변경 (ADMIN)

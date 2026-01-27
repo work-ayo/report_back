@@ -74,36 +74,40 @@ export const loginSchema = {
   },
 };
 
-
 export const meSchema = {
   tags: ["auth"],
   summary: "내 정보",
-  security: [{ bearerAuth: [] }], 
+  security: [{ bearerAuth: [] }],
   response: {
     200: {
       type: "object",
+      required: ["user"],
       properties: {
-   user: {
+        user: {
           type: "object",
-          required: ["userId", "id", "name", "department", "globalRole"],
+          required: ["userId", "id", "name", "department", "globalRole", "isActive"],
           properties: {
             userId: { type: "string" },
             id: { type: "string" },
             name: { type: "string" },
             department: { type: ["string", "null"] },
             globalRole: { type: "string" },
+            isActive: { type: "boolean" },
           },
         },
       },
-      required: ["user"],
     },
     401: {
       type: "object",
-      properties: { user: { type: "null" } },
-      required: ["user"],
+      required: ["code", "message"],
+      properties: {
+        code: { type: "string" },
+        message: { type: "string" },
+      },
     },
   },
 };
+
 
 export const changePasswordSchema = {
   tags: ["auth"],

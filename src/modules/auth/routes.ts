@@ -85,11 +85,11 @@ const authRoutes: FastifyPluginAsync = async (app) => {
 
   // 내 정보 (JWT 필요)
   app.get(
-   `${base}/me`,
+    `${base}/me`,
     { preHandler: (app as any).authenticate, schema: meSchema },
     async (req: any, reply) => {
       const userId = req.user?.sub as string;
-     
+
       const user = await app.prisma.user.findUnique({
         where: { userId },
         select: {
@@ -102,55 +102,57 @@ const authRoutes: FastifyPluginAsync = async (app) => {
         },
       });
 
-      if (!user || !user.isActive) return reply.code(401).send({ error: "unauthorized" });
+      if (!user || !user.isActive) return reply.status(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
+
 
       return reply.send({ user });
     }
   );
 
-app.patch(
-  `${base}/password`,
-  { preHandler: [requireAuth], schema: changePasswordSchema },
-  async (req: any, reply) => {
-    const userId = req.user?.sub as string;
 
-    const body = req.body as { password: string; newPassword: string };
-    const password = body.password ?? "";
-    const newPassword = body.newPassword ?? "";
+  app.patch(
+    `${base}/password`,
+    { preHandler: [requireAuth], schema: changePasswordSchema },
+    async (req: any, reply) => {
+      const userId = req.user?.sub as string;
 
-    if (!password || !newPassword) {
-      return reply.code(400).send({ code: "MISSING_FIELDS", message: "missing fields" });
-    }
-    if (newPassword.length < 8) {
-      return reply.code(400).send({ code: "PASSWORD_TOO_SHORT", message: "password too short" });
-    }
-    if (password === newPassword) {
-      return reply.code(400).send({ code: "SAME_PASSWORD", message: "new password must be different" });
-    }
+      const body = req.body as { password: string; newPassword: string };
+      const password = body.password ?? "";
+      const newPassword = body.newPassword ?? "";
 
-    const user = await app.prisma.user.findUnique({
-      where: { userId },
-      select: { userId: true, password: true, isActive: true },
+      if (!password || !newPassword) {
+        return reply.code(400).send({ code: "MISSING_FIELDS", message: "missing fields" });
+      }
+      if (newPassword.length < 8) {
+        return reply.code(400).send({ code: "PASSWORD_TOO_SHORT", message: "password too short" });
+      }
+      if (password === newPassword) {
+        return reply.code(400).send({ code: "SAME_PASSWORD", message: "new password must be different" });
+      }
+
+      const user = await app.prisma.user.findUnique({
+        where: { userId },
+        select: { userId: true, password: true, isActive: true },
+      });
+
+      if (!user || !user.isActive) {
+        return reply.code(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
+      }
+
+      const ok = await argon2.verify(user.password, password);
+      if (!ok) {
+        return reply.code(401).send({ code: "INVALID_PASSWORD", message: "invalid password" });
+      }
+
+      const hashed = await argon2.hash(newPassword);
+
+      await app.prisma.user.update({
+        where: { userId },
+        data: { password: hashed },
+      });
+
+      return reply.send({ ok: true });
     });
-
-    if (!user || !user.isActive) {
-      return reply.code(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
-    }
-
-    const ok = await argon2.verify(user.password, password);
-    if (!ok) {
-      return reply.code(401).send({ code: "INVALID_PASSWORD", message: "invalid password" });
-    }
-
-    const hashed = await argon2.hash(newPassword);
-
-    await app.prisma.user.update({
-      where: { userId },
-      data: { password: hashed },
-    });
-
-    return reply.send({ ok: true });
-  });
 
 };
 
