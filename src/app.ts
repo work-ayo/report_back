@@ -15,6 +15,7 @@ import weeklyRoutes from "./modules/weekly/routes.js";
 import adminTeamRoutes from "./modules/admin/teams/routes.js";
 import boardRoutes from "./modules/board/routes.js";
 import cardRoutes from "./modules/card/routes.js";
+import columnRoutes from "./modules/column/routes.js";
 
 export default function buildApp() {
   const app = Fastify({
@@ -51,8 +52,8 @@ app.addHook("onResponse", async (req, reply) => {
   const userId = (req as any).user?.sub as string | undefined;
 
   const msg = userId
-    ? `${req.method} ${url} -> ${status} (user=${userId})`
-    : `${req.method} ${url} -> ${status}`;
+    ? `(${status}) ${req.method} ${url} -> (user=${userId})`
+    : `(${status}) ${req.method} ${url}`;
 
   req.log.info(msg);
 });
@@ -93,7 +94,10 @@ app.addHook("onResponse", async (req, reply) => {
     return reply.code(statusCode).send({ code, message });
   });
 
-  app.register(cors, { origin: true, credentials: true });
+  app.register(cors, { origin: true, credentials: true,
+methods:["GET","POST","PUT","PATCH", "DELETE", "OPTIONS"]
+
+  });
   app.register(formbody);
 
   app.register(prismaPlugin);
@@ -108,6 +112,8 @@ app.addHook("onResponse", async (req, reply) => {
 
   app.register(boardRoutes);
   app.register(cardRoutes);
+  app.register(columnRoutes);
+
 
   app.get("/health", async () => ({ ok: true }));
 

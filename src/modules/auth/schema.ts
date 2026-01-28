@@ -111,16 +111,16 @@ export const meSchema = {
 
 export const changePasswordSchema = {
   tags: ["auth"],
-  summary: "비밀번호 변경",
+  summary: "내 정보 변경 (이름/비밀번호)",
   security: [{ bearerAuth: [] }],
   consumes: ["application/x-www-form-urlencoded"],
   body: {
     type: "object",
-    required: ["password", "newPassword"],
     additionalProperties: false,
     properties: {
-      password: { type: "string", minLength: 8, maxLength: 72, default: "" },
-      newPassword: { type: "string", minLength: 8, maxLength: 72, default: "" },
+      name: { type: "string", maxLength: 50, default: "" },
+      password: { type: "string", maxLength: 72, default: "" },     
+      newPassword: { type: "string", maxLength: 72, default: "" },  
     },
   },
   response: {

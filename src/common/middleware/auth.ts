@@ -1,53 +1,166 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 
 /**
- * JWT 인증 (app.decorate("authenticate", ...) 해둔 걸 사용)
+ * JWT 인증 (app.decorate("authenticate") 사용)
  */
 export async function requireAuth(req: FastifyRequest, reply: FastifyReply) {
-  // req.server === fastify instance
-  // authenticate는 jwtPlugin에서 decorate한 함수
-
   const app = req.server as any;
   return app.authenticate(req, reply);
 }
 
 /**
+ * 공통: 활성 유저 로드 (없으면 reply 보내고 null)
+ */
+async function getActiveUserOrReply(app: any, req: any, reply: any) {
+  const userId = req.user?.sub as string | undefined;
+  if (!userId) {
+    reply.status(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
+    return null;
+  }
+
+  const user = await app.prisma.user.findUnique({
+    where: { userId },
+    select: { userId: true, globalRole: true, isActive: true },
+  });
+
+  if (!user || !user.isActive) {
+    reply.status(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
+    return null;
+  }
+
+  return user as { userId: string; globalRole: "ADMIN" | "USER"; isActive: boolean };
+}
+
+/**
  * 전역 ADMIN만 통과
- * - requireAuth 이후에 실행되는 걸 전제로 함
+ * - requireAuth 이후 실행 전제
  */
 export function requireAdmin(app: any) {
   return async (req: any, reply: any) => {
-    const userId = req.user?.sub as string | undefined;
-    if (!userId) return reply.code(401).send({ error: "unauthorized" });
+    const user = await getActiveUserOrReply(app, req, reply);
+    if (!user) return;
 
-    const user = await app.prisma.user.findUnique({
-      where: { userId },
-      select: { globalRole: true, isActive: true },
-    });
-
-    if (!user || !user.isActive) return reply.code(401).send({ error: "unauthorized" });
-    if (user.globalRole !== "ADMIN") return reply.code(403).send({ error: "forbidden" });
+    if (user.globalRole !== "ADMIN") {
+      return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
+    }
   };
 }
 
 /**
- * teamId를 params에서 가져와 팀 멤버인지 확인
- * - requireAuth 이후에 실행
- *
+ * 팀 멤버인지 확인 (ADMIN bypass)
+ * - requireAuth 이후 실행 전제
  */
 export function requireTeamMember(app: any, getTeamId: (req: any) => string) {
   return async (req: any, reply: any) => {
-    const userId = req.user?.sub as string | undefined;
-    if (!userId) return reply.code(401).send({ error: "unauthorized" });
+    const user = await getActiveUserOrReply(app, req, reply);
+    if (!user) return;
 
     const teamId = getTeamId(req);
-    if (!teamId) return reply.code(400).send({ error: "teamId required" });
+    if (!teamId) {
+      return reply.status(400).send({ code: "TEAMID_REQUIRED", message: "teamId required" });
+    }
+
+    if (user.globalRole === "ADMIN") return;
 
     const member = await app.prisma.teamMember.findUnique({
-      where: { teamId_userId: { teamId, userId } },
+      where: { teamId_userId: { teamId, userId: user.userId } },
       select: { id: true },
     });
 
-    if (!member) return reply.code(403).send({ error: "forbidden" });
+    if (!member) {
+      return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
+    }
   };
+}
+
+/**
+ * 보드 접근 가능(팀 멤버 or ADMIN)
+ * - req.params.boardId 필요
+ */
+export function requireBoardAccess(app: any) {
+  return async (req: any, reply: any) => {
+    const user = await getActiveUserOrReply(app, req, reply);
+    if (!user) return;
+
+    const boardId = req.params?.boardId as string | undefined;
+    if (!boardId) {
+      return reply.status(400).send({ code: "BOARDID_REQUIRED", message: "boardId required" });
+    }
+
+    if (user.globalRole === "ADMIN") return;
+
+    const board = await app.prisma.board.findUnique({
+      where: { boardId },
+      select: { teamId: true },
+    });
+    if (!board) {
+      return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
+    }
+
+    const member = await app.prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId: board.teamId, userId: user.userId } },
+      select: { id: true },
+    });
+
+    if (!member) {
+      return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
+    }
+  };
+}
+
+/**
+ * 보드 수정/삭제 권한 (보드 생성자 or ADMIN)
+ * - req.params.boardId 필요
+ */
+export function requireBoardOwnerOrAdmin(app: any) {
+  return async (req: any, reply: any) => {
+    const user = await getActiveUserOrReply(app, req, reply);
+    if (!user) return;
+
+    const boardId = req.params?.boardId as string | undefined;
+    if (!boardId) {
+      return reply.status(400).send({ code: "BOARDID_REQUIRED", message: "boardId required" });
+    }
+
+    if (user.globalRole === "ADMIN") return;
+
+    const board = await app.prisma.board.findUnique({
+      where: { boardId },
+      select: { createdByUserId: true },
+    });
+    if (!board) {
+      return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
+    }
+
+    if (board.createdByUserId !== user.userId) {
+      return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
+    }
+  };
+}
+
+
+export async function assertTeamMemberByBoard(app: any, userId: string, boardId: string) {
+  // active user + admin bypass
+  const me = await app.prisma.user.findUnique({
+    where: { userId },
+    select: { globalRole: true, isActive: true },
+  });
+  if (!me || !me.isActive) {
+    return { ok: false as const, status: 401, code: "UNAUTHORIZED", message: "unauthorized" };
+  }
+  if (me.globalRole === "ADMIN") return { ok: true as const };
+
+  const board = await app.prisma.board.findUnique({
+    where: { boardId },
+    select: { teamId: true },
+  });
+  if (!board) return { ok: false as const, status: 404, code: "BOARD_NOT_FOUND", message: "board not found" };
+
+  const member = await app.prisma.teamMember.findUnique({
+    where: { teamId_userId: { teamId: board.teamId, userId } },
+    select: { id: true },
+  });
+  if (!member) return { ok: false as const, status: 403, code: "FORBIDDEN", message: "forbidden" };
+
+  return { ok: true as const };
 }

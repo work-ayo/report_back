@@ -110,49 +110,76 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   );
 
 
-  app.patch(
-    `${base}/password`,
-    { preHandler: [requireAuth], schema: changePasswordSchema },
-    async (req: any, reply) => {
-      const userId = req.user?.sub as string;
+app.patch(
+  `${base}/me`,
+  { preHandler: [requireAuth], schema: changePasswordSchema },
+  async (req: any, reply) => {
+    const userId = req.user?.sub as string;
 
-      const body = req.body as { password: string; newPassword: string };
-      const password = body.password ?? "";
-      const newPassword = body.newPassword ?? "";
+    const body = req.body as { name?: string; password?: string; newPassword?: string };
 
+    const name = body.name?.trim();
+    const password = (body.password ?? "").trim();
+    const newPassword = (body.newPassword ?? "").trim();
+
+    const wantChangeName = name !== undefined && name.length > 0;
+    const wantChangePassword = password.length > 0 || newPassword.length > 0;
+
+    // 아무 것도 안 보내면 400
+    if (!wantChangeName && !wantChangePassword) {
+      return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
+    }
+
+    // 비번 변경이면 둘 다 있어야 함
+    if (wantChangePassword) {
       if (!password || !newPassword) {
-        return reply.code(400).send({ code: "MISSING_FIELDS", message: "missing fields" });
+        return reply.status(400).send({ code: "MISSING_FIELDS", message: "missing password fields" });
       }
       if (newPassword.length < 8) {
-        return reply.code(400).send({ code: "PASSWORD_TOO_SHORT", message: "password too short" });
+        return reply.status(400).send({ code: "PASSWORD_TOO_SHORT", message: "password too short" });
       }
       if (password === newPassword) {
-        return reply.code(400).send({ code: "SAME_PASSWORD", message: "new password must be different" });
+        return reply.status(400).send({ code: "SAME_PASSWORD", message: "new password must be different" });
       }
+    }
 
-      const user = await app.prisma.user.findUnique({
-        where: { userId },
-        select: { userId: true, password: true, isActive: true },
-      });
+    const user = await app.prisma.user.findUnique({
+      where: { userId },
+      select: { userId: true, password: true, isActive: true },
+    });
 
-      if (!user || !user.isActive) {
-        return reply.code(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
+    if (!user || !user.isActive) {
+      return reply.status(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
+    }
+
+    const data: any = {};
+
+    // 이름 변경
+    if (wantChangeName) {
+      if (name.length > 50) {
+        return reply.status(400).send({ code: "NAME_TOO_LONG", message: "name too long" });
       }
+      data.name = name;
+    }
 
+    // 비번 변경
+    if (wantChangePassword) {
       const ok = await argon2.verify(user.password, password);
       if (!ok) {
-        return reply.code(401).send({ code: "INVALID_PASSWORD", message: "invalid password" });
+        return reply.status(401).send({ code: "INVALID_PASSWORD", message: "invalid password" });
       }
+      data.password = await argon2.hash(newPassword);
+    }
 
-      const hashed = await argon2.hash(newPassword);
-
-      await app.prisma.user.update({
-        where: { userId },
-        data: { password: hashed },
-      });
-
-      return reply.send({ ok: true });
+    await app.prisma.user.update({
+      where: { userId },
+      data,
     });
+
+    return reply.send({ ok: true });
+  }
+);
+
 
 };
 

@@ -1,25 +1,9 @@
 import type { FastifyPluginAsync } from "fastify";
-import { requireAuth } from "../../common/middleware/auth.js";
+import { requireAuth, assertTeamMemberByBoard } from "../../common/middleware/auth.js";
 import { createCardSchema, updateCardSchema, deleteCardSchema, moveCardSchema } from "./schema.js";
 
 function iso(d: Date) {
   return d.toISOString();
-}
-
-async function assertTeamMemberByBoard(app: any, userId: string, boardId: string) {
-  const board = await app.prisma.board.findUnique({
-    where: { boardId },
-    select: { teamId: true },
-  });
-  if (!board) return { ok: false as const, code: "BOARD_NOT_FOUND", message: "board not found" };
-
-  const member = await app.prisma.teamMember.findUnique({
-    where: { teamId_userId: { teamId: board.teamId, userId } },
-    select: { id: true },
-  });
-  if (!member) return { ok: false as const, code: "FORBIDDEN", message: "forbidden" };
-
-  return { ok: true as const };
 }
 
 const cardRoutes: FastifyPluginAsync = async (app) => {
@@ -41,8 +25,6 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
       });
       if (!column) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
 
-      const auth = await assertTeamMemberByBoard(app, userId, column.boardId);
-      if (!auth.ok) return reply.status(auth.code === "FORBIDDEN" ? 403 : 404).send({ code: auth.code, message: auth.message });
 
       // 해당 컬럼의 마지막 order + 1
       const last = await app.prisma.card.findFirst({

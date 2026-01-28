@@ -1,8 +1,9 @@
 import type { FastifyPluginAsync } from "fastify";
-import { requireAuth, requireTeamMember } from "../../common/middleware/auth.js";
+import { requireAuth, requireBoardAccess, requireBoardOwnerOrAdmin, requireTeamMember } from "../../common/middleware/auth.js";
 import { createBoardSchema, listBoardsSchema, getBoardDetailSchema,updateBoardSchema,deleteBoardSchema } from "./schema.js";
 
 const boardRoutes: FastifyPluginAsync = async (app) => {
+
   // 팀 보드 목록 (팀 멤버만)
   app.get(
     "/teams/:teamId/boards",
@@ -67,87 +68,149 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
   );
 
   // 보드 상세: columns + cards (팀 멤버만)
-  app.get(
-    "/boards/:boardId",
-    { preHandler: [requireAuth], schema: getBoardDetailSchema },
-    async (req: any, reply) => {
-      const boardId = req.params.boardId as string;
-      const userId = req.user.sub as string;
+app.get(
+  "/boards/:boardId",
+  { preHandler: [requireAuth, requireBoardAccess(app)], schema: getBoardDetailSchema },
+  async (req: any, reply) => {
+    const boardId = req.params.boardId as string;
 
-      // 보드 + 팀 확인
-      const board = await app.prisma.board.findUnique({
+    const board = await app.prisma.board.findUnique({
+      where: { boardId },
+      select: {
+        boardId: true,
+        teamId: true,
+        name: true,
+        createdByUserId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    if (!board) return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
+
+    const [columns, cards] = await Promise.all([
+      app.prisma.column.findMany({
         where: { boardId },
-        select: { boardId: true, teamId: true, name: true, createdByUserId: true, createdAt: true, updatedAt: true },
-      });
-      if (!board) return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
-
-      // 팀 멤버 체크
-      const member = await app.prisma.teamMember.findUnique({
-        where: { teamId_userId: { teamId: board.teamId, userId } },
-        select: { id: true },
-      });
-      if (!member) return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
-
-      const [columns, cards] = await Promise.all([
-        app.prisma.column.findMany({
-          where: { boardId },
-          select: { columnId: true, boardId: true, name: true, status: true, order: true },
-          orderBy: { order: "asc" },
-        }),
-        app.prisma.card.findMany({
-          where: { boardId },
-          select: { cardId: true, boardId: true, columnId: true, title: true, content: true, order: true, createdByUserId: true, createdAt: true, updatedAt: true },
-          orderBy: [{ columnId: "asc" }, { order: "asc" }],
-        }),
-      ]);
-
-      return reply.send({
-        board: {
-          ...board,
-          createdAt: board.createdAt.toISOString(),
-          updatedAt: board.updatedAt.toISOString(),
+        select: { columnId: true, boardId: true, name: true, status: true, order: true },
+        orderBy: { order: "asc" },
+      }),
+      app.prisma.card.findMany({
+        where: { boardId },
+        select: {
+          cardId: true,
+          boardId: true,
+          columnId: true,
+          title: true,
+          content: true,
+          order: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: { select: { userId: true, name: true } }, 
         },
-        columns,
-        cards: cards.map((c) => ({
-          ...c,
-          createdAt: c.createdAt.toISOString(),
-          updatedAt: c.updatedAt.toISOString(),
-        })),
-      });
+        orderBy: [{ columnId: "asc" }, { order: "asc" }],
+      })
+
+    ]);
+
+
+    // cardsById
+    const cardsById: Record<string, any> = {};
+    for (const c of cards) {
+      cardsById[c.cardId] = {
+        ...c,
+        createdAt: c.createdAt.toISOString(),
+        updatedAt: c.updatedAt.toISOString(),
+      };
     }
-  );
+
+    // cardIdsByColumnId (컬럼 순서와 무관하게 카드만 그룹)
+   const cardIdsByColumnId: Record<string, string[]> = Object.create(null);
+
+    for (const col of columns) {
+      cardIdsByColumnId[col.columnId] = [];
+    }
+
+    for (const c of cards) {
+      (cardIdsByColumnId[c.columnId] ??= []).push(c.cardId);
+    }
+
+
+    return reply.send({
+      board: {
+        ...board,
+        createdAt: board.createdAt.toISOString(),
+        updatedAt: board.updatedAt.toISOString(),
+      },
+      columns,
+      cardsById,
+      cardIdsByColumnId,
+    });
+  }
+);
+
+
 
   //보드삭제
-  app.delete(
-    "/boards/:boardId",
-    {
-      preHandler: [requireAuth],
-      schema: deleteBoardSchema,
-    },
-    async (req: any, reply) => {
-      const boardId = req.params.boardId as string;
-      const userId = req.user.sub as string;
+app.delete(
+  "/boards/:boardId",
+  { preHandler: [requireAuth], schema: deleteBoardSchema },
+  async (req: any, reply) => {
+    const boardId = req.params.boardId as string;
+    const userId = req.user.sub as string;
 
-      // 보드 확인
-      const board = await app.prisma.board.findUnique({
-        where: { boardId },
-        select: { boardId: true, teamId: true, createdByUserId: true },
-      });
-      if (!board) return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
+    const board = await app.prisma.board.findUnique({
+      where: { boardId },
+      select: { boardId: true, teamId: true, createdByUserId: true },
+    });
+    if (!board) return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
 
-      // 작성자만 삭제 가능
-      if (board.createdByUserId !== userId) {
-        return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
-      }
+    //admin 여부 확인
+    const me = await app.prisma.user.findUnique({
+      where: { userId },
+      select: { globalRole: true, isActive: true },
+    });
+    if (!me || !me.isActive) return reply.status(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
 
-      // 보드 삭제
-      await app.prisma.board.delete({
-        where: { boardId },
-      });
+    const isAdmin = me.globalRole === "ADMIN";
+    const isCreator = board.createdByUserId === userId;
 
-      return reply.send({ message: "Board deleted successfully" });
+    // 작성자 or 어드민
+    if (!isAdmin && !isCreator) {
+      return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
     }
-  );  
+
+    await app.prisma.board.delete({ where: { boardId } });
+
+    return reply.send({ ok: true });
+  }
+);
+app.patch(
+  "/boards/:boardId",
+  {
+    preHandler: [requireAuth, requireBoardOwnerOrAdmin(app)],
+    schema: updateBoardSchema,
+  },
+  async (req: any, reply) => {
+    const boardId = req.params.boardId as string;
+    const body = req.body as { name: string };
+    const name = body.name?.trim();
+    if (!name) return reply.status(400).send({ code: "NAME_REQUIRED", message: "name required" });
+
+    const updated = await app.prisma.board.update({
+      where: { boardId },
+      data: { name },
+      select: { boardId: true, teamId: true, name: true, createdByUserId: true, createdAt: true, updatedAt: true },
+    });
+
+    return reply.send({
+      board: {
+        ...updated,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      },
+    });
+  }
+);
+
 
   
 };
