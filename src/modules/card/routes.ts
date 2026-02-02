@@ -5,98 +5,220 @@ import { createCardSchema, updateCardSchema, deleteCardSchema, moveCardSchema } 
 function iso(d: Date) {
   return d.toISOString();
 }
+function parseIsoDateOrNull(v: unknown): Date | null {
+  const s = typeof v === "string" ? v.trim() : "";
+  if (!s) return null;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+
 
 const cardRoutes: FastifyPluginAsync = async (app) => {
-  // 카드 생성
-  app.post(
-    "/card",
-    { preHandler: [requireAuth], schema: createCardSchema },
-    async (req: any, reply) => {
-      const userId = req.user.sub as string;
-      const body = req.body as { columnId: string; title: string; content?: string };
+app.post(
+  "/card",
+  { preHandler: [requireAuth], schema: createCardSchema },
+  async (req: any, reply) => {
+    const userId = req.user.sub as string;
 
-      const columnId = body.columnId.trim();
-      const title = body.title.trim();
-      const content = (body.content ?? "").trim();
+    const body = req.body as {
+      columnId: string;
+      title: string;
+      content?: string;
+      projectId?: string;
+      dueDate?: string; // ISO string
+    };
 
-      const column = await app.prisma.column.findUnique({
-        where: { columnId },
-        select: { columnId: true, boardId: true },
-      });
-      if (!column) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
+    const columnId = body.columnId.trim();
+    const title = body.title.trim();
+    const content = (body.content ?? "").trim();
+    const projectId = (body.projectId ?? "").trim() || null;
 
-
-      // 해당 컬럼의 마지막 order + 1
-      const last = await app.prisma.card.findFirst({
-        where: { columnId },
-        select: { order: true },
-        orderBy: { order: "desc" },
-      });
-      const nextOrder = (last?.order ?? 0) + 1;
-
-      const card = await app.prisma.card.create({
-        data: {
-          boardId: column.boardId,
-          columnId,
-          title,
-          content: content.length > 0 ? content : null,
-          order: nextOrder,
-          createdByUserId: userId,
-        },
-      });
-
-      return reply.code(201).send({
-        card: {
-          ...card,
-          createdAt: iso(card.createdAt),
-          updatedAt: iso(card.updatedAt),
-        },
-      });
+    const dueDate = parseIsoDateOrNull(body.dueDate);
+    if (body.dueDate && !dueDate) {
+      return reply.status(400).send({ code: "INVALID_DUEDATE", message: "invalid dueDate" });
     }
-  );
 
-  // 카드 수정
-  app.patch(
-    "/card/:cardId",
-    { preHandler: [requireAuth], schema: updateCardSchema },
-    async (req: any, reply) => {
-      const userId = req.user.sub as string;
-      const cardId = req.params.cardId as string;
-      const body = req.body as { title?: string; content?: string };
+    const column = await app.prisma.column.findUnique({
+      where: { columnId },
+      select: { columnId: true, boardId: true },
+    });
+    if (!column) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
 
-      const existing = await app.prisma.card.findUnique({
-        where: { cardId },
-        select: { cardId: true, boardId: true },
+    // 팀 멤버/ADMIN 체크
+    const auth = await assertTeamMemberByBoard(app, userId, column.boardId);
+    if (!auth.ok) return reply.status(auth.status).send({ code: auth.code, message: auth.message });
+
+    // 보드의 teamId 가져오기(프로젝트 검증에 필요)
+    const board = await app.prisma.board.findUnique({
+      where: { boardId: column.boardId },
+      select: { teamId: true },
+    });
+    if (!board) return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
+
+    // projectId가 있으면 같은 팀 프로젝트인지 확인
+    if (projectId) {
+      const project = await app.prisma.project.findUnique({
+        where: { projectId },
+        select: { teamId: true },
       });
-      if (!existing) return reply.status(404).send({ code: "CARD_NOT_FOUND", message: "card not found" });
-
-      const auth = await assertTeamMemberByBoard(app, userId, existing.boardId);
-      if (!auth.ok) return reply.status(auth.code === "FORBIDDEN" ? 403 : 404).send({ code: auth.code, message: auth.message });
-
-      const data: any = {};
-      if (body.title !== undefined) data.title = body.title.trim();
-      if (body.content !== undefined) {
-        const c = body.content.trim();
-        data.content = c.length > 0 ? c : null;
+      if (!project) return reply.status(404).send({ code: "PROJECT_NOT_FOUND", message: "project not found" });
+      if (project.teamId !== board.teamId) {
+        return reply.status(400).send({ code: "INVALID_PROJECT", message: "project is not in the same team" });
       }
-      if (Object.keys(data).length === 0) {
-        return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
-      }
-
-      const card = await app.prisma.card.update({
-        where: { cardId },
-        data,
-      });
-
-      return reply.send({
-        card: {
-          ...card,
-          createdAt: iso(card.createdAt),
-          updatedAt: iso(card.updatedAt),
-        },
-      });
     }
-  );
+
+    // 해당 컬럼의 마지막 order + 1
+    const last = await app.prisma.card.findFirst({
+      where: { columnId },
+      select: { order: true },
+      orderBy: { order: "desc" },
+    });
+    const nextOrder = (last?.order ?? 0) + 1;
+
+    const card = await app.prisma.card.create({
+      data: {
+        boardId: column.boardId,
+        columnId,
+        title,
+        content: content.length > 0 ? content : null,
+        projectId,
+        dueDate, // Date | null
+        order: nextOrder,
+        createdByUserId: userId,
+      },
+      select: {
+        cardId: true,
+        boardId: true,
+        columnId: true,
+        title: true,
+        content: true,
+        projectId: true,
+        dueDate: true,
+        order: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return reply.code(201).send({
+      card: {
+        ...card,
+        dueDate: card.dueDate ? iso(card.dueDate) : null,
+        createdAt: iso(card.createdAt),
+        updatedAt: iso(card.updatedAt),
+      },
+    });
+  }
+);
+
+app.patch(
+  "/card/:cardId",
+  { preHandler: [requireAuth], schema: updateCardSchema },
+  async (req: any, reply) => {
+    const userId = req.user.sub as string;
+    const cardId = req.params.cardId as string;
+
+    const body = req.body as {
+      title?: string;
+      content?: string;
+      projectId?: string; // optional
+      dueDate?: string;   // ISO string, ""이면 해제
+    };
+
+    const existing = await app.prisma.card.findUnique({
+      where: { cardId },
+      select: { cardId: true, boardId: true },
+    });
+    if (!existing) return reply.status(404).send({ code: "CARD_NOT_FOUND", message: "card not found" });
+
+    const auth = await assertTeamMemberByBoard(app, userId, existing.boardId);
+    if (!auth.ok) return reply.status(auth.status).send({ code: auth.code, message: auth.message });
+
+    const data: any = {};
+
+    if (body.title !== undefined) {
+      const t = body.title.trim();
+      if (!t) return reply.status(400).send({ code: "TITLE_REQUIRED", message: "title required" });
+      data.title = t;
+    }
+
+    if (body.content !== undefined) {
+      const c = body.content.trim();
+      data.content = c.length > 0 ? c : null;
+    }
+
+    // dueDate: 빈문자열이면 null(해제), 값 있으면 ISO 파싱
+    if (body.dueDate !== undefined) {
+      const s = body.dueDate.trim();
+      if (!s) {
+        data.dueDate = null;
+      } else {
+        const d = parseIsoDateOrNull(s);
+        if (!d) return reply.status(400).send({ code: "INVALID_DUEDATE", message: "invalid dueDate" });
+        data.dueDate = d;
+      }
+    }
+
+    // projectId: 빈문자열이면 null(해제), 값 있으면 같은 팀인지 검증
+    if (body.projectId !== undefined) {
+      const pid = body.projectId.trim();
+      if (!pid) {
+        data.projectId = null;
+      } else {
+        const board = await app.prisma.board.findUnique({
+          where: { boardId: existing.boardId },
+          select: { teamId: true },
+        });
+        if (!board) return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
+
+        const project = await app.prisma.project.findUnique({
+          where: { projectId: pid },
+          select: { teamId: true },
+        });
+        if (!project) return reply.status(404).send({ code: "PROJECT_NOT_FOUND", message: "project not found" });
+        if (project.teamId !== board.teamId) {
+          return reply.status(400).send({ code: "INVALID_PROJECT", message: "project is not in the same team" });
+        }
+
+        data.projectId = pid;
+      }
+    }
+
+    if (Object.keys(data).length === 0) {
+      return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
+    }
+
+    const card = await app.prisma.card.update({
+      where: { cardId },
+      data,
+      select: {
+        cardId: true,
+        boardId: true,
+        columnId: true,
+        title: true,
+        content: true,
+        projectId: true,
+        dueDate: true,
+        order: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return reply.send({
+      card: {
+        ...card,
+        dueDate: card.dueDate ? iso(card.dueDate) : null,
+        createdAt: iso(card.createdAt),
+        updatedAt: iso(card.updatedAt),
+      },
+    });
+  }
+);
+
+
 
   // 카드 삭제
   app.delete(

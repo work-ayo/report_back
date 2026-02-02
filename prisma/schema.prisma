@@ -61,6 +61,7 @@ model Team {
   members TeamMember[]
   reports WeeklyReport[]
   boards  Board[]
+  projects Project[]
 }
 
 model TeamMember {
@@ -145,14 +146,37 @@ model Column {
   @@index([boardId])
 }
 
+model Project {
+  projectId String @id @default(cuid())
+
+  teamId String
+  code   String  //프로젝트코드
+  name   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team  Team   @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
+  cards Card[]
+
+  @@unique([teamId, code])   // 팀 내 코드 유니크
+  @@index([teamId])
+}
+
 model Card {
   cardId   String @id @default(cuid())
   boardId  String
   columnId String
 
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [projectId], onDelete: SetNull)
+
   title   String
   content String? @db.Text
+  dueDate DateTime?
+
   order   Int
+
 
   createdByUserId String
   createdBy       User   @relation("CardCreator", fields: [createdByUserId], references: [userId], onDelete: Cascade)
@@ -166,4 +190,5 @@ model Card {
   @@unique([columnId, order])
   @@index([boardId])
   @@index([columnId])
+  @@index([projectId])
 }

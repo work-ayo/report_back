@@ -11,6 +11,8 @@ export const createCardSchema = {
       columnId: { type: "string", default: "" },
       title: { type: "string", minLength: 1, maxLength: 120, default: "" },
       content: { type: "string", default: "" }, // 빈 문자열 허용
+      projectId:{type:"string",default:""},
+      dueDate:{type:"string", default:""}
     },
   },
   response: {

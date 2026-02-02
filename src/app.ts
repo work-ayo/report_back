@@ -16,6 +16,8 @@ import adminTeamRoutes from "./modules/admin/teams/routes.js";
 import boardRoutes from "./modules/board/routes.js";
 import cardRoutes from "./modules/card/routes.js";
 import columnRoutes from "./modules/column/routes.js";
+import adminProjectRoutes from "./modules/admin/project/routes.js";
+import projectRoutes from "./modules/project/routes.js";
 
 export default function buildApp() {
   const app = Fastify({
@@ -106,7 +108,12 @@ methods:["GET","POST","PUT","PATCH", "DELETE", "OPTIONS"]
   app.register(swaggerPlugin);
   app.register(adminRoutes);
   app.register(adminTeamRoutes);
+  app.register(adminProjectRoutes);
+
+  
+
   app.register(authRoutes);
+  app.register(projectRoutes);
   app.register(teamRoutes);
   app.register(weeklyRoutes);
 

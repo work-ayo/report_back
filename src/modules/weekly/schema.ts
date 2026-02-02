@@ -1,6 +1,6 @@
 export const getMyReportsSchema = {
   tags: ["report"],
-  summary: "내 주간보고 조회",
+  summary: "내 주간보고 조회 (기간)",
   security: [{ bearerAuth: [] }],
   querystring: {
     type: "object",
@@ -8,18 +8,15 @@ export const getMyReportsSchema = {
     additionalProperties: false,
     properties: {
       teamId: { type: "string" },
-      weekStart: { type: "string" },
-      limit: { type: "integer", minimum: 1, maximum: 52, default: 8 },
-      beforeWeekStart: { type: "string" },
+      startDate: { type: "string", description: "YYYY-MM-DD (optional)" },
+      endDate: { type: "string", description: "YYYY-MM-DD (optional)" },
     },
   },
   response: {
-    200: {
-      type: "object",
-      additionalProperties: true,
-    },
+    200: { type: "object", additionalProperties: true },
   },
 };
+
 
 
 export const upsertMyReportSchema = {
