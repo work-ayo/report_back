@@ -1,12 +1,13 @@
 const projectShape = {
   type: "object",
-  required: ["projectId", "teamId", "teamName", "code", "name", "createdAt", "updatedAt"],
+  required: ["projectId", "teamId", "teamName", "code", "name", "price", "createdAt", "updatedAt"],
   properties: {
     projectId: { type: "string" },
     teamId: { type: "string" },
     teamName: { type: "string" },
     code: { type: "string" },
     name: { type: "string" },
+    price: { type: "integer", minimum: 0, default: 0 },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },
@@ -30,26 +31,22 @@ export const adminListAllProjectsSchema = {
       properties: {
         projects: {
           type: "array",
-          items: {
-            type: "object",
-            required: ["projectId", "teamId", "code", "name", "createdAt", "updatedAt"],
-            properties: {
-              projectId: { type: "string" },
-              teamId: { type: "string" },
-              code: { type: "string" },
-              name: { type: "string" },
-              createdAt: { type: "string" },
-              updatedAt: { type: "string" },
-            },
-          },
+          items: projectShape, 
         },
       },
     },
-    401: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    403: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    401: {
+      type: "object",
+      required: ["code", "message"],
+      properties: { code: { type: "string" }, message: { type: "string" } },
+    },
+    403: {
+      type: "object",
+      required: ["code", "message"],
+      properties: { code: { type: "string" }, message: { type: "string" } },
+    },
   },
 };
-
 
 export const adminCreateProjectSchema = {
   tags: ["admin/projects"],
@@ -64,12 +61,21 @@ export const adminCreateProjectSchema = {
       teamId: { type: "string", default: "" },
       code: { type: "string", minLength: 1, maxLength: 40, default: "" },
       name: { type: "string", minLength: 1, maxLength: 80, default: "" },
+      price: { type: "integer", minimum: 0, default: 0 },
     },
   },
   response: {
     201: { type: "object", required: ["project"], properties: { project: projectShape } },
-    409: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    409: {
+      type: "object",
+      required: ["code", "message"],
+      properties: { code: { type: "string" }, message: { type: "string" } },
+    },
+    404: {
+      type: "object",
+      required: ["code", "message"],
+      properties: { code: { type: "string" }, message: { type: "string" } },
+    },
   },
 };
 
@@ -90,12 +96,21 @@ export const adminUpdateProjectSchema = {
       teamId: { type: "string", default: "" }, // 팀 이동 허용(원치 않으면 제거)
       code: { type: "string", maxLength: 40, default: "" },
       name: { type: "string", maxLength: 80, default: "" },
+      price: { type: "integer", minimum: 0, default: 0 }, 
     },
   },
   response: {
     200: { type: "object", required: ["project"], properties: { project: projectShape } },
-    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    409: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    404: {
+      type: "object",
+      required: ["code", "message"],
+      properties: { code: { type: "string" }, message: { type: "string" } },
+    },
+    409: {
+      type: "object",
+      required: ["code", "message"],
+      properties: { code: { type: "string" }, message: { type: "string" } },
+    },
   },
 };
 
@@ -110,6 +125,10 @@ export const adminDeleteProjectSchema = {
   },
   response: {
     200: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } },
-    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    404: {
+      type: "object",
+      required: ["code", "message"],
+      properties: { code: { type: "string" }, message: { type: "string" } },
+    },
   },
 };

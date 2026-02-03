@@ -22,7 +22,7 @@ export const createCardSchema = {
       properties: {
         card: {
           type: "object",
-          required: ["cardId", "boardId", "columnId", "title", "content", "order", "createdByUserId", "createdAt", "updatedAt"],
+          required: ["cardId", "boardId", "columnId", "title", "content", "order", "createdAt", "updatedAt"],
           properties: {
             cardId: { type: "string" },
             boardId: { type: "string" },
@@ -58,6 +58,7 @@ export const updateCardSchema = {
     properties: {
       title: { type: "string", minLength: 1, maxLength: 120, default: "" },
       content: { type: "string", default: "" },
+     dueDate:{type:"string", default:""}
     },
   },
   response: {
@@ -67,13 +68,14 @@ export const updateCardSchema = {
       properties: {
         card: {
           type: "object",
-          required: ["cardId", "boardId", "columnId", "title", "content", "order", "createdByUserId", "createdAt", "updatedAt"],
+          required: ["cardId", "boardId", "columnId", "title", "content", "order", "createdAt", "updatedAt"],
           properties: {
             cardId: { type: "string" },
             boardId: { type: "string" },
             columnId: { type: "string" },
             title: { type: "string" },
             content: { type: ["string", "null"] },
+            dueDate:{type:"string"},
             order: { type: "integer" },
             createdByUserId: { type: "string" },
             createdAt: { type: "string" },

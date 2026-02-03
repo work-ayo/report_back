@@ -1,3 +1,82 @@
+const boardShape = {
+  type: "object",
+  required: ["boardId", "teamId", "name", "createdAt", "updatedAt"],
+  properties: {
+    boardId: { type: "string" },
+    teamId: { type: "string" },
+    name: { type: "string" },
+    createdAt: { type: "string" },
+    updatedAt: { type: "string" },
+  },
+};
+
+const columnShape = {
+  type: "object",
+  required: ["columnId", "boardId", "name", "status", "order"],
+  properties: {
+    columnId: { type: "string" },
+    boardId: { type: "string" },
+    name: { type: "string" },
+    status: { type: "string" }, // enum으로 좁히고 싶으면 enum: ["TODO","IN_PROGRESS","DONE","CUSTOM"]
+    order: { type: "integer" },
+  },
+};
+
+const projectShape = {
+  type: ["object", "null"],
+  required: ["projectId", "teamId", "code", "name", "price", "createdAt", "updatedAt"],
+  properties: {
+    projectId: { type: "string" },
+    teamId: { type: "string" },
+    code: { type: "string" },
+    name: { type: "string" },
+    price: { type: "integer", minimum: 0 },
+    // createdAt: { type: "string" },
+    // updatedAt: { type: "string" },
+  },
+};
+
+const createdByShape = {
+  type: "object",
+  required: ["userId", "name"],
+  properties: {
+    userId: { type: "string" },
+    name: { type: "string" },
+  },
+};
+
+const cardShape = {
+  type: "object",
+  required: [
+    "cardId",
+    "boardId",
+    "columnId",
+    "title",
+    "content",
+    "order",
+    "createdAt",
+    "updatedAt",
+    "createdBy",
+    "project",
+  ],
+  properties: {
+    cardId: { type: "string" },
+    boardId: { type: "string" },
+    columnId: { type: "string" },
+    title: { type: "string" },
+    content: { type: ["string", "null"] },
+    order: { type: "integer" },
+    createdAt: { type: "string" },
+    updatedAt: { type: "string" },
+    // 너가 select로 넣은 형태
+    createdBy: createdByShape,
+
+    // project는 nullable (card.projectId가 null일 수 있으니까)
+    project: projectShape,
+  },
+};
+
+
 export const createBoardSchema = {
   tags: ["board"],
   summary: "보드 생성",
@@ -77,7 +156,7 @@ export const listBoardsSchema = {
 
 export const getBoardDetailSchema = {
   tags: ["board"],
-  summary: "보드 상세 (정규화 + createdBy 포함)",
+  summary: "보드 상세 (컬럼 + 카드 + createdBy + project)",
   security: [{ bearerAuth: [] }],
   params: {
     type: "object",
@@ -90,68 +169,20 @@ export const getBoardDetailSchema = {
     200: {
       type: "object",
       required: ["board", "columns", "cardsById", "cardIdsByColumnId"],
-      additionalProperties: false,
       properties: {
-        board: {
-          type: "object",
-          required: ["boardId", "teamId", "name", "createdByUserId", "createdAt", "updatedAt"],
-          additionalProperties: false,
-          properties: {
-            boardId: { type: "string" },
-            teamId: { type: "string" },
-            name: { type: "string" },
-            createdByUserId: { type: "string" }, // 보드는 그대로 유지(원하면 이것도 createdBy로 바꿀 수 있음)
-            createdAt: { type: "string" },
-            updatedAt: { type: "string" },
-          },
-        },
-
+        board: boardShape,
         columns: {
           type: "array",
-          items: {
-            type: "object",
-            required: ["columnId", "boardId", "name", "status", "order"],
-            additionalProperties: false,
-            properties: {
-              columnId: { type: "string" },
-              boardId: { type: "string" },
-              name: { type: "string" },
-              status: { type: "string" }, // TODO/IN_PROGRESS/DONE/CUSTOM
-              order: { type: "integer" },
-            },
-          },
+          items: columnShape,
         },
 
-        // cardId -> card object
+        // cardsById: Record<string, Card>
         cardsById: {
           type: "object",
-          additionalProperties: {
-            type: "object",
-            required: ["cardId", "boardId", "columnId", "title", "content", "order", "createdBy", "createdAt", "updatedAt"],
-            additionalProperties: false,
-            properties: {
-              cardId: { type: "string" },
-              boardId: { type: "string" },
-              columnId: { type: "string" },
-              title: { type: "string" },
-              content: { type: ["string", "null"] },
-              order: { type: "integer" },
-              createdBy: {
-                type: "object",
-                required: ["userId", "name"],
-                additionalProperties: false,
-                properties: {
-                  userId: { type: "string" },
-                  name: { type: "string" },
-                },
-              },
-              createdAt: { type: "string" },
-              updatedAt: { type: "string" },
-            },
-          },
+          additionalProperties: cardShape,
         },
 
-        // columnId -> [cardId...]
+        // cardIdsByColumnId: Record<string, string[]>
         cardIdsByColumnId: {
           type: "object",
           additionalProperties: {
@@ -161,6 +192,10 @@ export const getBoardDetailSchema = {
         },
       },
     },
+
+    401: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    403: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
   },
 };
 

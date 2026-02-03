@@ -1,50 +1,28 @@
-export const adminListAllProjectsSchema = {
-  tags: ["admin/projects"],
-  summary: "전체 프로젝트 목록 (ADMIN)",
-  security: [{ bearerAuth: [] }],
-  querystring: {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      teamId: { type: "string", description: "optional: 특정 팀만" },
-    },
-  },
-  response: {
-    200: {
-      type: "object",
-      required: ["projects"],
-      properties: {
-        projects: {
-          type: "array",
-          items: {
-            type: "object",
-            required: ["projectId", "teamId", "code", "name", "createdAt", "updatedAt"],
-            properties: {
-              projectId: { type: "string" },
-              teamId: { type: "string" },
-              code: { type: "string" },
-              name: { type: "string" },
-              createdAt: { type: "string" },
-              updatedAt: { type: "string" },
-            },
-          },
-        },
-      },
-    },
-    401: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    403: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+const projectShape = {
+  type: "object",
+  required: ["projectId", "teamId", "code", "name", "price", "createdAt", "updatedAt"],
+  properties: {
+    projectId: { type: "string" },
+    teamId: { type: "string" },
+    code: { type: "string" },
+    name: { type: "string" },
+    price: { type: "integer", minimum: 0 },
+    createdAt: { type: "string" },
+    updatedAt: { type: "string" },
   },
 };
 
 
 export const listProjectsSchema = {
-  tags: ["project"],
-  summary: "팀 프로젝트 목록",
+  tags: ["projects"],
+  summary: "팀 프로젝트 목록 조회",
   security: [{ bearerAuth: [] }],
   params: {
     type: "object",
     required: ["teamId"],
-    properties: { teamId: { type: "string" } },
+    properties: {
+      teamId: { type: "string" },
+    },
   },
   response: {
     200: {
@@ -53,41 +31,34 @@ export const listProjectsSchema = {
       properties: {
         projects: {
           type: "array",
-          items: {
-            type: "object",
-            required: ["projectId", "teamId", "code", "name", "createdAt", "updatedAt"],
-            properties: {
-              projectId: { type: "string" },
-              teamId: { type: "string" },
-              code: { type: "string" },
-              name: { type: "string" },
-              createdAt: { type: "string" },
-              updatedAt: { type: "string" },
-            },
-          },
+          items: projectShape,
         },
       },
     },
   },
 };
 
+
 export const createProjectSchema = {
-  tags: ["project"],
-  summary: "프로젝트 생성",
-  consumes: ["application/x-www-form-urlencoded"],
+  tags: ["projects"],
+  summary: "프로젝트 생성 (팀원)",
   security: [{ bearerAuth: [] }],
+  consumes: ["application/x-www-form-urlencoded"],
   params: {
     type: "object",
     required: ["teamId"],
-    properties: { teamId: { type: "string" } },
+    properties: {
+      teamId: { type: "string" },
+    },
   },
   body: {
     type: "object",
     required: ["code", "name"],
     additionalProperties: false,
     properties: {
-      code: { type: "string", minLength: 1, maxLength: 40, default: "" },
-      name: { type: "string", minLength: 1, maxLength: 80, default: "" },
+      code: { type: "string", minLength: 1, maxLength: 40 },
+      name: { type: "string", minLength: 1, maxLength: 80 },
+      price: { type: "integer", minimum: 0, default: 0 },
     },
   },
   response: {
@@ -95,72 +66,58 @@ export const createProjectSchema = {
       type: "object",
       required: ["project"],
       properties: {
-        project: {
-          type: "object",
-          required: ["projectId", "teamId", "code", "name", "createdAt", "updatedAt"],
-          properties: {
-            projectId: { type: "string" },
-            teamId: { type: "string" },
-            code: { type: "string" },
-            name: { type: "string" },
-            createdAt: { type: "string" },
-            updatedAt: { type: "string" },
-          },
-        },
+        project: projectShape,
       },
     },
+    400: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
     409: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
   },
 };
 
 export const getProjectSchema = {
-  tags: ["project"],
+  tags: ["projects"],
   summary: "프로젝트 단건 조회",
   security: [{ bearerAuth: [] }],
   params: {
     type: "object",
     required: ["projectId"],
-    properties: { projectId: { type: "string" } },
+    properties: {
+      projectId: { type: "string" },
+    },
   },
   response: {
     200: {
       type: "object",
       required: ["project"],
       properties: {
-        project: {
-          type: "object",
-          required: ["projectId", "teamId", "code", "name", "createdAt", "updatedAt"],
-          properties: {
-            projectId: { type: "string" },
-            teamId: { type: "string" },
-            code: { type: "string" },
-            name: { type: "string" },
-            createdAt: { type: "string" },
-            updatedAt: { type: "string" },
-          },
-        },
+        project: projectShape,
       },
     },
-    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    403: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
+    404: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
   },
 };
 
+
 export const updateProjectSchema = {
-  tags: ["project"],
-  summary: "프로젝트 수정 (code/name)",
-  consumes: ["application/x-www-form-urlencoded"],
+  tags: ["projects"],
+  summary: "프로젝트 수정",
   security: [{ bearerAuth: [] }],
+  consumes: ["application/x-www-form-urlencoded"],
   params: {
     type: "object",
     required: ["projectId"],
-    properties: { projectId: { type: "string" } },
+    properties: {
+      projectId: { type: "string" },
+    },
   },
   body: {
     type: "object",
     additionalProperties: false,
     properties: {
-      code: { type: "string", maxLength: 40, default: "" }, // optional
-      name: { type: "string", maxLength: 80, default: "" }, // optional
+      code: { type: "string", maxLength: 40 },
+      name: { type: "string", maxLength: 80 },
+      price: { type: "integer", minimum: 0 },
     },
   },
   response: {
@@ -168,36 +125,36 @@ export const updateProjectSchema = {
       type: "object",
       required: ["project"],
       properties: {
-        project: {
-          type: "object",
-          required: ["projectId", "teamId", "code", "name", "createdAt", "updatedAt"],
-          properties: {
-            projectId: { type: "string" },
-            teamId: { type: "string" },
-            code: { type: "string" },
-            name: { type: "string" },
-            createdAt: { type: "string" },
-            updatedAt: { type: "string" },
-          },
-        },
+        project: projectShape,
       },
     },
-    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    409: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    400: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    403: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
+    404: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
+    409: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
   },
 };
 
 export const deleteProjectSchema = {
-  tags: ["project"],
+  tags: ["projects"],
   summary: "프로젝트 삭제",
   security: [{ bearerAuth: [] }],
   params: {
     type: "object",
     required: ["projectId"],
-    properties: { projectId: { type: "string" } },
+    properties: {
+      projectId: { type: "string" },
+    },
   },
   response: {
-    200: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } },
-    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    200: {
+      type: "object",
+      required: ["ok"],
+      properties: {
+        ok: { type: "boolean" },
+      },
+    },
+    403: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
+    404: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
   },
 };

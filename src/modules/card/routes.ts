@@ -13,6 +13,24 @@ function parseIsoDateOrNull(v: unknown): Date | null {
   return d;
 }
 
+async function reassignOrdersSafe(tx: any, columnId: string, orderedCardIds: string[]) {
+  // 1) temp
+  for (let i = 0; i < orderedCardIds.length; i++) {
+    await tx.card.update({
+      where: { cardId: orderedCardIds[i] },
+      data: { order: -100000 - i },
+    });
+  }
+  // 2) final
+  for (let i = 0; i < orderedCardIds.length; i++) {
+    await tx.card.update({
+      where: { cardId: orderedCardIds[i] },
+      data: { order: i + 1 },
+    });
+  }
+}
+
+
 
 
 const cardRoutes: FastifyPluginAsync = async (app) => {
@@ -260,92 +278,91 @@ app.patch(
   );
 
   // 카드 이동/정렬
-  app.patch(
-    "/card/:cardId/move",
-    { preHandler: [requireAuth], schema: moveCardSchema },
-    async (req: any, reply) => {
-      const userId = req.user.sub as string;
-      const cardId = req.params.cardId as string;
-      const body = req.body as { toColumnId: string; toIndex: number };
+app.patch(
+  "/card/:cardId/move",
+  { preHandler: [requireAuth], schema: moveCardSchema },
+  async (req: any, reply) => {
+    const cardId = String(req.params.cardId ?? "");
+    const toColumnId = String(req.body?.toColumnId ?? "");
+    const toIndex = Number(req.body?.toIndex);
 
-      const toColumnId = body.toColumnId.trim();
-      const toIndex = Number(body.toIndex);
+    if (!cardId || !toColumnId || Number.isNaN(toIndex) || toIndex < 0) {
+      return reply.status(400).send({ code: "BAD_REQUEST" });
+    }
 
-      const card = await app.prisma.card.findUnique({
-        where: { cardId },
-        select: { cardId: true, boardId: true, columnId: true },
-      });
-      if (!card) return reply.status(404).send({ code: "CARD_NOT_FOUND", message: "card not found" });
-
-      const auth = await assertTeamMemberByBoard(app, userId, card.boardId);
-      if (!auth.ok) return reply.status(auth.code === "FORBIDDEN" ? 403 : 404).send({ code: auth.code, message: auth.message });
-
-      const toColumn = await app.prisma.column.findUnique({
-        where: { columnId: toColumnId },
-        select: { columnId: true, boardId: true },
-      });
-      if (!toColumn) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
-
-      // 다른 보드 컬럼으로 이동 방지
-      if (toColumn.boardId !== card.boardId) {
-        return reply.status(400).send({ code: "INVALID_TARGET", message: "target column is not in the same board" });
-      }
-
-      const fromColumnId = card.columnId;
-
+    try {
       await app.prisma.$transaction(async (tx: any) => {
-        // from 목록
-        const fromCards = await tx.card.findMany({
-          where: { columnId: fromColumnId },
-          select: { cardId: true },
-          orderBy: { order: "asc" },
+        const card = await tx.card.findUnique({
+          where: { cardId },
+          select: { cardId: true, columnId: true },
         });
+        if (!card) throw Object.assign(new Error("CARD_NOT_FOUND"), { statusCode: 404 });
 
-        // to 목록
-        const toCards = fromColumnId === toColumnId
-          ? fromCards
-          : await tx.card.findMany({
-              where: { columnId: toColumnId },
-              select: { cardId: true },
-              orderBy: { order: "asc" },
-            });
+        const targetCol = await tx.column.findUnique({
+          where: { columnId: toColumnId },
+          select: { columnId: true },
+        });
+        if (!targetCol) throw Object.assign(new Error("COLUMN_NOT_FOUND"), { statusCode: 404 });
 
-        // fromCards에서 cardId 제거
-        const fromIds = fromCards.map((c: any) => c.cardId).filter((id: string) => id !== cardId);
+        const fromColumnId = card.columnId;
+        const isSameColumn = fromColumnId === toColumnId;
 
-        if (fromColumnId === toColumnId) {
-          // 같은 컬럼 내 이동
-          const idx = Math.max(0, Math.min(toIndex, fromIds.length));
-          fromIds.splice(idx, 0, cardId);
+        // from ids (order순)
+        const fromIds = (
+          await tx.card.findMany({
+            where: { columnId: fromColumnId },
+            orderBy: { order: "asc" },
+            select: { cardId: true },
+          })
+        ).map((c: any) => c.cardId);
 
-          // order 재정렬
-          for (let i = 0; i < fromIds.length; i++) {
-            await tx.card.update({ where: { cardId: fromIds[i] }, data: { order: i + 1 } });
-          }
-        } else {
-          // 다른 컬럼으로 이동
-          const toIds = toCards.map((c: any) => c.cardId);
-          const idx = Math.max(0, Math.min(toIndex, toIds.length));
-          toIds.splice(idx, 0, cardId);
+        // to ids (order순)
+        const toIdsBase = isSameColumn
+          ? fromIds.slice()
+          : (
+              await tx.card.findMany({
+                where: { columnId: toColumnId },
+                orderBy: { order: "asc" },
+                select: { cardId: true },
+              })
+            ).map((c: any) => c.cardId);
 
-          // card의 columnId 변경(일단 먼저)
-          await tx.card.update({ where: { cardId }, data: { columnId: toColumnId } });
+        // nextTo 만들기
+        const nextTo = toIdsBase.filter((id: string) => id !== cardId);
+        const idx = Math.max(0, Math.min(toIndex, nextTo.length));
+        nextTo.splice(idx, 0, cardId);
 
-          // from 컬럼 order 재정렬
-          for (let i = 0; i < fromIds.length; i++) {
-            await tx.card.update({ where: { cardId: fromIds[i] }, data: { order: i + 1 } });
-          }
+        // 다른 컬럼 이동이면 columnId 먼저 바꾸되, order는 임시로 안전하게
+        if (!isSameColumn) {
+          // 임시 order는 충돌 안 나는 값으로
+          await tx.card.update({
+            where: { cardId },
+            data: { columnId: toColumnId, order: -999999 },
+          });
+        }
 
-          // to 컬럼 order 재정렬
-          for (let i = 0; i < toIds.length; i++) {
-            await tx.card.update({ where: { cardId: toIds[i] }, data: { order: i + 1 } });
-          }
+        // ✅ to 컬럼 order를 2-phase로 재부여(충돌 방지)
+        await reassignOrdersSafe(tx, toColumnId, nextTo);
+
+        // ✅ from 컬럼도 2-phase로 재부여(다른 컬럼 이동일 때만)
+        if (!isSameColumn) {
+          const nextFrom = fromIds.filter((id: string) => id !== cardId);
+          await reassignOrdersSafe(tx, fromColumnId, nextFrom);
         }
       });
 
       return reply.send({ ok: true });
+    } catch (e: any) {
+      req.log.error(e);
+      if (e?.statusCode === 404) return reply.status(404).send({ code: e.message });
+      return reply.status(500).send({ code: "MOVE_FAILED" });
     }
-  );
+  }
+);
+
+
+
+
 };
 
 export default cardRoutes;

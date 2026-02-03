@@ -90,9 +90,10 @@ app.get(
     const [columns, cards] = await Promise.all([
       app.prisma.column.findMany({
         where: { boardId },
-        select: { columnId: true, boardId: true, name: true, status: true, order: true },
+        select: { columnId: true, boardId: true, name: true, status: true, order: true,},
         orderBy: { order: "asc" },
       }),
+
       app.prisma.card.findMany({
         where: { boardId },
         select: {
@@ -104,6 +105,7 @@ app.get(
           order: true,
           createdAt: true,
           updatedAt: true,
+          project:true,
           createdBy: { select: { userId: true, name: true } }, 
         },
         orderBy: [{ columnId: "asc" }, { order: "asc" }],

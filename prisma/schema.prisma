@@ -150,8 +150,11 @@ model Project {
   projectId String @id @default(cuid())
 
   teamId String
-  code   String  //프로젝트코드
+  code   String
   name   String
+
+  // 원 단위(정수)
+  price  Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -159,7 +162,7 @@ model Project {
   team  Team   @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
   cards Card[]
 
-  @@unique([teamId, code])   // 팀 내 코드 유니크
+  @@unique([teamId, code])
   @@index([teamId])
 }
 
