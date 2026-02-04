@@ -14,14 +14,12 @@ function parseIsoDateOrNull(v: unknown): Date | null {
 }
 
 async function reassignOrdersSafe(tx: any, columnId: string, orderedCardIds: string[]) {
-  // 1) temp
   for (let i = 0; i < orderedCardIds.length; i++) {
     await tx.card.update({
       where: { cardId: orderedCardIds[i] },
       data: { order: -100000 - i },
     });
   }
-  // 2) final
   for (let i = 0; i < orderedCardIds.length; i++) {
     await tx.card.update({
       where: { cardId: orderedCardIds[i] },
@@ -236,8 +234,6 @@ app.patch(
   }
 );
 
-
-
   // 카드 삭제
   app.delete(
     "/card/:cardId",
@@ -359,8 +355,6 @@ app.patch(
     }
   }
 );
-
-
 
 
 };

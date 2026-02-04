@@ -103,14 +103,6 @@ model WeeklyReport {
   @@index([teamId, weekStart])
 }
 
-//kanban board
-enum ColumnStatus {
-  TODO
-  IN_PROGRESS
-  DONE
-  CUSTOM
-}
-
 model Board {
   boardId         String @id @default(cuid())
   teamId          String
@@ -133,7 +125,6 @@ model Column {
   columnId String       @id @default(cuid())
   boardId  String
   name     String
-  status   ColumnStatus @default(CUSTOM)
   order    Int
 
   createdAt DateTime @default(now())
@@ -155,6 +146,10 @@ model Project {
 
   // 원 단위(정수)
   price  Int @default(0)
+
+  //프로젝트 시작, 마감일
+  startDate DateTime?
+  endDate DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

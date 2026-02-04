@@ -12,12 +12,11 @@ const boardShape = {
 
 const columnShape = {
   type: "object",
-  required: ["columnId", "boardId", "name", "status", "order"],
+  required: ["columnId", "boardId", "name", "order"],
   properties: {
     columnId: { type: "string" },
     boardId: { type: "string" },
     name: { type: "string" },
-    status: { type: "string" }, // enum으로 좁히고 싶으면 enum: ["TODO","IN_PROGRESS","DONE","CUSTOM"]
     order: { type: "integer" },
   },
 };
@@ -54,6 +53,7 @@ const cardShape = {
     "title",
     "content",
     "order",
+    "dueDate",
     "createdAt",
     "updatedAt",
     "createdBy",
@@ -68,9 +68,8 @@ const cardShape = {
     order: { type: "integer" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
-    // 너가 select로 넣은 형태
     createdBy: createdByShape,
-
+   dueDate: { type: ["string", "null"],},
     // project는 nullable (card.projectId가 null일 수 있으니까)
     project: projectShape,
   },

@@ -10,7 +10,6 @@ export const createColumnSchema = {
     properties: {
       boardId: { type: "string", default: "" },
       name: { type: "string", minLength: 1, maxLength: 60, default: "" },
-      status: { type: "string", enum: ["TODO", "IN_PROGRESS", "DONE", "CUSTOM"], default: "CUSTOM" },
     },
   },
   response: {
@@ -20,12 +19,11 @@ export const createColumnSchema = {
       properties: {
         column: {
           type: "object",
-          required: ["columnId", "boardId", "name", "status", "order"],
+          required: ["columnId", "boardId", "name", "order"],
           properties: {
             columnId: { type: "string" },
             boardId: { type: "string" },
             name: { type: "string" },
-            status: { type: "string" },
             order: { type: "integer" },
           },
         },
@@ -49,7 +47,6 @@ export const updateColumnSchema = {
     additionalProperties: false,
     properties: {
       name: { type: "string", minLength: 1, maxLength: 60, default: "" },
-      status: { type: "string", enum: ["TODO", "IN_PROGRESS", "DONE", "CUSTOM"], default: "CUSTOM" },
     },
   },
   response: {
@@ -59,12 +56,11 @@ export const updateColumnSchema = {
       properties: {
         column: {
           type: "object",
-          required: ["columnId", "boardId", "name", "status", "order"],
+          required: ["columnId", "boardId", "name", "order"],
           properties: {
             columnId: { type: "string" },
             boardId: { type: "string" },
             name: { type: "string" },
-            status: { type: "string" },
             order: { type: "integer" },
           },
         },

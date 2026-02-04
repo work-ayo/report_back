@@ -32,11 +32,10 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
     { preHandler: [requireAuth], schema: createColumnSchema },
     async (req: any, reply) => {
       const userId = req.user.sub as string;
-      const body = req.body as { boardId: string; name: string; status?: string };
+      const body = req.body as { boardId: string; name: string; };
 
       const boardId = body.boardId.trim();
       const name = body.name.trim();
-      const status = body.status ?? "CUSTOM";
 
       const access = await assertBoardAccess(app, userId, boardId);
       if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });
@@ -49,8 +48,8 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
       const nextOrder = (last?.order ?? 0) + 1;
 
       const column = await app.prisma.column.create({
-        data: { boardId, name, status, order: nextOrder },
-        select: { columnId: true, boardId: true, name: true, status: true, order: true },
+        data: { boardId, name,  order: nextOrder },
+        select: { columnId: true, boardId: true, name: true,  order: true },
       });
 
       return reply.code(201).send({ column });
@@ -64,7 +63,7 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
     async (req: any, reply) => {
       const userId = req.user.sub as string;
       const columnId = req.params.columnId as string;
-      const body = req.body as { name?: string; status?: string };
+      const body = req.body as { name?: string; };
 
       const existing = await app.prisma.column.findUnique({
         where: { columnId },
@@ -77,7 +76,6 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
 
       const data: any = {};
       if (body.name !== undefined) data.name = body.name.trim();
-      if (body.status !== undefined) data.status = body.status;
 
       if (Object.keys(data).length === 0) {
         return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
@@ -86,7 +84,7 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
       const column = await app.prisma.column.update({
         where: { columnId },
         data,
-        select: { columnId: true, boardId: true, name: true, status: true, order: true },
+        select: { columnId: true, boardId: true, name: true,  order: true },
       });
 
       return reply.send({ column });

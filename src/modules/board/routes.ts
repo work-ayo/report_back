@@ -52,13 +52,13 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
         });
 
         // 기본 컬럼 3개
-        await tx.column.createMany({
-          data: [
-            { boardId: created.boardId, name: "To Do", status: "TODO", order: 1 },
-            { boardId: created.boardId, name: "In Progress", status: "IN_PROGRESS", order: 2 },
-            { boardId: created.boardId, name: "Done", status: "DONE", order: 3 },
-          ],
-        });
+       await tx.column.createMany({
+      data: [
+              { boardId: created.boardId, name: "To Do", order: 1 },
+              { boardId: created.boardId, name: "In Progress", order: 2 },
+              { boardId: created.boardId, name: "Done", order: 3 },
+            ],
+          });
 
         return created;
       });
@@ -81,6 +81,7 @@ app.get(
         teamId: true,
         name: true,
         createdByUserId: true,
+      
         createdAt: true,
         updatedAt: true,
       },
@@ -90,7 +91,7 @@ app.get(
     const [columns, cards] = await Promise.all([
       app.prisma.column.findMany({
         where: { boardId },
-        select: { columnId: true, boardId: true, name: true, status: true, order: true,},
+        select: { columnId: true, boardId: true, name: true, order: true},
         orderBy: { order: "asc" },
       }),
 
@@ -100,6 +101,7 @@ app.get(
           cardId: true,
           boardId: true,
           columnId: true,
+          dueDate:true,
           title: true,
           content: true,
           order: true,
@@ -119,6 +121,7 @@ app.get(
     for (const c of cards) {
       cardsById[c.cardId] = {
         ...c,
+        dueDate: c.dueDate ? c.dueDate.toISOString() : null, 
         createdAt: c.createdAt.toISOString(),
         updatedAt: c.updatedAt.toISOString(),
       };
