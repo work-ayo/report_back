@@ -8,6 +8,8 @@ const projectShape = {
     code: { type: "string" },
     name: { type: "string" },
     price: { type: "integer", minimum: 0, default: 0 },
+    startDate:{type:"string"},
+    endDate:{type:"string"},
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },
@@ -62,20 +64,16 @@ export const adminCreateProjectSchema = {
       code: { type: "string", minLength: 1, maxLength: 40, default: "" },
       name: { type: "string", minLength: 1, maxLength: 80, default: "" },
       price: { type: "integer", minimum: 0, default: 0 },
+
+      startDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
+      endDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
     },
   },
   response: {
     201: { type: "object", required: ["project"], properties: { project: projectShape } },
-    409: {
-      type: "object",
-      required: ["code", "message"],
-      properties: { code: { type: "string" }, message: { type: "string" } },
-    },
-    404: {
-      type: "object",
-      required: ["code", "message"],
-      properties: { code: { type: "string" }, message: { type: "string" } },
-    },
+    409: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    400: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
   },
 };
 
@@ -93,24 +91,20 @@ export const adminUpdateProjectSchema = {
     type: "object",
     additionalProperties: false,
     properties: {
-      teamId: { type: "string", default: "" }, // 팀 이동 허용(원치 않으면 제거)
+      teamId: { type: "string", default: "" },
       code: { type: "string", maxLength: 40, default: "" },
       name: { type: "string", maxLength: 80, default: "" },
-      price: { type: "integer", minimum: 0, default: 0 }, 
+      price: { type: "integer", minimum: 0, default: 0 },
+
+      startDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
+      endDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
     },
   },
   response: {
     200: { type: "object", required: ["project"], properties: { project: projectShape } },
-    404: {
-      type: "object",
-      required: ["code", "message"],
-      properties: { code: { type: "string" }, message: { type: "string" } },
-    },
-    409: {
-      type: "object",
-      required: ["code", "message"],
-      properties: { code: { type: "string" }, message: { type: "string" } },
-    },
+    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    409: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    400: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
   },
 };
 

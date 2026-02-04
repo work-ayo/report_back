@@ -7,8 +7,8 @@ import {
   adminDeleteProjectSchema,
 } from "./schema.js";
 
-function iso(d: Date) {
-  return d.toISOString();
+function iso(d: Date | null | undefined) {
+  return d ? d.toISOString() : null;
 }
 
 // formbody로 오면 string일 수 있어서 안전 파싱
@@ -40,6 +40,8 @@ const adminProjectRoutes: FastifyPluginAsync = async (app) => {
           code: true,
           name: true,
           price: true,
+          startDate:true,
+          endDate:true,
           createdAt: true,
           updatedAt: true,
           team: { select: { name: true } },
@@ -55,6 +57,8 @@ const adminProjectRoutes: FastifyPluginAsync = async (app) => {
           code: p.code,
           name: p.name,
           price: p.price, 
+          startDate:iso(p.startDate),
+          endDate: iso(p.endDate),
           createdAt: iso(p.createdAt),
           updatedAt: iso(p.updatedAt),
         })),
@@ -102,6 +106,8 @@ const adminProjectRoutes: FastifyPluginAsync = async (app) => {
             teamName: team.name,
             code: project.code,
             name: project.name,
+            startDate:iso(project.startDate),
+            endDate:iso(project.endDate),
             price: project.price,
             createdAt: iso(project.createdAt),
             updatedAt: iso(project.updatedAt),
@@ -155,7 +161,7 @@ const adminProjectRoutes: FastifyPluginAsync = async (app) => {
         const project = await app.prisma.project.update({
           where: { projectId },
           data,
-          select: { projectId: true, teamId: true, code: true, name: true, price: true, createdAt: true, updatedAt: true },
+          select: { projectId: true, teamId: true, code: true, name: true, price: true, createdAt: true, updatedAt: true ,startDate:true, endDate:true},
         });
 
         return reply.send({
@@ -166,6 +172,8 @@ const adminProjectRoutes: FastifyPluginAsync = async (app) => {
             code: project.code,
             name: project.name,
             price: project.price,
+                 startDate:iso(project.startDate),
+            endDate:iso(project.endDate),
             createdAt: iso(project.createdAt),
             updatedAt: iso(project.updatedAt),
           },

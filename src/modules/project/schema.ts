@@ -7,6 +7,8 @@ const projectShape = {
     code: { type: "string" },
     name: { type: "string" },
     price: { type: "integer", minimum: 0 },
+    startDate:{type:"string"},
+    endDate:{type:"string"},
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },

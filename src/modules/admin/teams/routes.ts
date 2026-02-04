@@ -42,34 +42,60 @@ function toYmd(d: Date): string {
 const adminTeamsRoutes: FastifyPluginAsync = async (app) => {
     const adminPreHandler = [requireAuth, requireAdmin(app)];
     // 팀 생성 (ADMIN)
-    app.post(
-        `${team_base}`,
-        { preHandler: adminPreHandler, schema: adminCreateTeamSchema },
-        async (req: any, reply) => {
-            const body = req.body as { name: string };
-            const name = body.name?.trim();
-            if (!name) return reply.code(400).send({ code: "NAME_REQUIRED", message: "name required" });
+   app.post(
+    `${team_base}`,
+    { preHandler: adminPreHandler, schema: adminCreateTeamSchema },
+    async (req: any, reply) => {
+      const body = req.body as { name: string };
+      const name = body.name?.trim();
+      if (!name) return reply.code(400).send({ code: "NAME_REQUIRED", message: "name required" });
 
-            // joinCode 생성(충돌 시 재시도)
-            let joinCode = randomJoinCode(8);
-            for (let i = 0; i < 5; i++) {
-                const exists = await app.prisma.team.findUnique({ where: { joinCode } });
-                if (!exists) break;
-                joinCode = randomJoinCode(8);
-            }
+      const creatorUserId = req.user.sub as string;
 
-            const team = await app.prisma.team.create({
-                data: {
-                    name,
-                    joinCode,
-                    createdByUserId: req.user.sub,
-                },
-                select: { teamId: true, name: true, joinCode: true },
-            });
+      // joinCode 생성(충돌 시 재시도)
+      let joinCode = randomJoinCode(8);
+      for (let i = 0; i < 10; i++) {
+        const exists = await app.prisma.team.findUnique({ where: { joinCode } });
+        if (!exists) break;
+        joinCode = randomJoinCode(8);
+      }
 
-            return reply.code(201).send({ team });
-        }
-    );
+      const result = await app.prisma.$transaction(async (tx) => {
+        // 팀 생성
+        const team = await tx.team.create({
+          data: {
+            name,
+            joinCode,
+            createdByUserId: creatorUserId, 
+          },
+          select: { teamId: true, name: true, joinCode: true },
+        });
+
+        //기본 보드 생성
+        const board = await tx.board.create({
+          data: {
+            teamId: team.teamId,
+            name: `${name}의 보드`,
+            createdByUserId: creatorUserId, // 이것도 Board가 User.userId 참조면 동일
+          },
+          select: { boardId: true, teamId: true, name: true, createdByUserId: true },
+        });
+
+        //  기본 컬럼까지 같이 만들면 UX가 훨씬 좋아짐
+        await tx.column.createMany({
+          data: [
+            { boardId: board.boardId, name: "TO DO", order: 1 },
+            { boardId: board.boardId, name: "In Progress", order: 2 },
+            { boardId: board.boardId, name: "DONE", order: 3 },
+          ],
+        });
+
+        return { team, board };
+      });
+
+      return reply.code(201).send(result);
+    }
+  );
 
     // 팀 삭제 (ADMIN)
     app.delete(

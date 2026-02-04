@@ -155,7 +155,7 @@ export const listBoardsSchema = {
 
 export const getBoardDetailSchema = {
   tags: ["board"],
-  summary: "보드 상세 (컬럼 + 카드 + createdBy + project)",
+  summary: "보드 상세 (컬럼 + 카드 + project)",
   security: [{ bearerAuth: [] }],
   params: {
     type: "object",

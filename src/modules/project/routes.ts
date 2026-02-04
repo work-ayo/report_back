@@ -65,6 +65,8 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
           code: true,
           name: true,
           price: true,
+          startDate:true,
+          endDate:true,
           createdAt: true,
           updatedAt: true,
         },
@@ -74,6 +76,8 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
       return reply.send({
         projects: projects.map((p) => ({
           ...p,
+          startDate:iso(p.startDate),
+          endDate:iso(p.endDate),
           createdAt: iso(p.createdAt),
           updatedAt: iso(p.updatedAt),
         })),

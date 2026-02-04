@@ -32,3 +32,34 @@ export function toYmd(d: Date): string {
   const day = String(d.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
+export function formatKrw(amount: number) {
+  return amount.toLocaleString("ko-KR") + "원";
+}
+
+export function parseYmd(ymd: string): Date {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+export function diffDays(a: Date, b: Date): number {
+  // a - b (일 단위)
+  const ms = 24 * 60 * 60 * 1000;
+  return Math.floor((a.getTime() - b.getTime()) / ms);
+}
+
+// endDate 기준 dDay: 남은 일수(미래면 +), 지나면 -
+export function calcDDay(endYmd: string, today = new Date()): number {
+  const t = new Date(today);
+  t.setHours(0, 0, 0, 0);
+  const end = parseYmd(endYmd);
+  return diffDays(end, t);
+}
+
+export function labelDDay(dDay: number): string {
+  if (dDay === 0) return "D-DAY";
+  if (dDay > 0) return `D-${dDay}`;
+  return `D+${Math.abs(dDay)}`;
+}
