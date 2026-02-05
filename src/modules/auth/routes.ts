@@ -57,13 +57,13 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     const id = body.id?.trim();
     const password = body.password ?? "";
 
-    if (!id || !password) throw E.noUser("1", "check id or password");
+    if (!id || !password) throw E.unauthorized("1", "check id or password");
 
     const user = await app.prisma.user.findUnique({ where: { id } });
-    if (!user || !user.isActive) throw E.unauthorized("AUTH_INVALID_CREDENTIALS", "invalid credentials");
+    if (!user || !user.isActive) throw E.unauthorized("1", "check id or password");
 
     const ok = await argon2.verify(user.password, password);
-    if (!ok) throw E.unauthorized("AUTH_INVALID_CREDENTIALS", "invalid credentials");
+    if (!ok) throw E.unauthorized("1", "check password");
 
     await app.prisma.user.update({
       where: { userId: user.userId },

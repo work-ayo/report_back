@@ -13,7 +13,6 @@ export class AppError extends Error {
 }
 
 export const E = {
-  noUser: (code: string, message: string, details?: unknown) => new AppError(400, code, message, details),
   badRequest: (code: string, message: string, details?: unknown) => new AppError(400, code, message, details),
   unauthorized: (code: string, message: string, details?: unknown) => new AppError(401, code, message, details),
   forbidden: (code: string, message: string, details?: unknown) => new AppError(403, code, message, details),

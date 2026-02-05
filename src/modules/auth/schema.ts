@@ -70,9 +70,18 @@ export const loginSchema = {
         },
       },
     },
-    ...commonErrorResponses
+
+    ...commonErrorResponses,
+    401: {
+      ...errorResponseSchema,
+      properties: {
+        ...errorResponseSchema.properties,
+        code: { type: "string", enum: ["1"] },
+      },
+    },
   },
-};
+} as const;
+
 
 export const meSchema = {
   tags: ["auth"],

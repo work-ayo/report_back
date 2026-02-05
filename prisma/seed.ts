@@ -29,11 +29,11 @@ const TEST = {
   board: {
     name: "메인 보드",
   },
-  columns: ["할 일", "진행중", "완료"],
+  columns: ["TODO", "IN PROGRESS", "DONE"],
   cards: [
-    { col: "할 일", title: "홈 대시보드 UI 만들기", content: "KPI + 프로젝트 리스트 + 디데이" },
-    { col: "진행중", title: "Fastify 홈 요약 API 추가", content: "GET /home/summary" },
-    { col: "완료", title: "Prisma 마이그레이션 적용", content: "migrate dev 완료" },
+    { col: "TODO", title: "홈 대시보드 UI 만들기", content: "KPI + 프로젝트 리스트 + 디데이" },
+    { col: "IN PROGRESS", title: "Fastify 홈 요약 API 추가", content: "GET /home/summary" },
+    { col: "DONE", title: "Prisma 마이그레이션 적용", content: "migrate dev 완료" },
   ],
 };
 
