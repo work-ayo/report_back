@@ -1,3 +1,5 @@
+import { commonErrorResponses } from "../../common/commonResponse.js";
+
 export const createColumnSchema = {
   tags: ["column"],
   summary: "컬럼 생성",
@@ -29,6 +31,7 @@ export const createColumnSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -66,6 +69,7 @@ export const updateColumnSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -84,6 +88,7 @@ export const deleteColumnSchema = {
       required: ["ok"],
       properties: { ok: { type: "boolean" } },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -111,5 +116,6 @@ export const moveColumnSchema = {
       required: ["ok"],
       properties: { ok: { type: "boolean" } },
     },
+     ...commonErrorResponses
   },
 };

@@ -1,3 +1,5 @@
+import { commonErrorResponses } from "../../common/commonResponse.js";
+
 export const createCardSchema = {
   tags: ["card"],
   summary: "카드 생성",
@@ -37,6 +39,7 @@ export const createCardSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -84,6 +87,7 @@ export const updateCardSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -104,6 +108,7 @@ export const deleteCardSchema = {
       required: ["ok"],
       properties: { ok: { type: "boolean" } },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -134,5 +139,7 @@ export const moveCardSchema = {
       required: ["ok"],
       properties: { ok: { type: "boolean" } },
     },
+
+     ...commonErrorResponses
   },
 };

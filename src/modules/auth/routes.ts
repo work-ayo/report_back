@@ -8,6 +8,7 @@ import {
   meSchema,
   changePasswordSchema
 } from "./schema.js";
+import { E } from "../../common/errors.js";
 
 const base = "/auth";
 
@@ -16,7 +17,7 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   app.post(`${base}/signup`, { schema: signupSchema }, async (req, reply) => {
     const body = req.body as {
       id: string; // 로그인 아이디
-      password: string; // 평문 입력
+      password: string; 
       name: string;
       department?: string;
     };
@@ -56,13 +57,13 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     const id = body.id?.trim();
     const password = body.password ?? "";
 
-    if (!id || !password) return reply.code(400).send({ error: "missing credentials" });
+    if (!id || !password) throw E.noUser("1", "check id or password");
 
     const user = await app.prisma.user.findUnique({ where: { id } });
-    if (!user || !user.isActive) return reply.code(401).send({ error: "invalid credentials" });
+    if (!user || !user.isActive) throw E.unauthorized("AUTH_INVALID_CREDENTIALS", "invalid credentials");
 
     const ok = await argon2.verify(user.password, password);
-    if (!ok) return reply.code(401).send({ error: "invalid credentials" });
+    if (!ok) throw E.unauthorized("AUTH_INVALID_CREDENTIALS", "invalid credentials");
 
     await app.prisma.user.update({
       where: { userId: user.userId },

@@ -63,39 +63,28 @@ app.addHook("onResponse", async (req, reply) => {
 
 
   //전역 에러 핸들러 (응답 + 로그 통일)
-  app.setErrorHandler((err, req, reply) => {
-    let statusCode = 500;
-    let code = "INTERNAL_ERROR";
-    let message = "internal server error";
+app.setErrorHandler((err, req, reply) => {
+  // fastify schema validation 에러
+  if ((err as any).validation) {
+    return reply.code(400).send({
+      code: "VALIDATION_ERROR",
+      message: "invalid request",
+      details: { validation: (err as any).validation },
+    });
+  }
 
-    // Fastify validation 에러
-    if ((err as any).validation) {
-      statusCode = 400;
-      code = "VALIDATION_ERROR";
-      message = "invalid request";
-    }
+  if (err instanceof AppError) {
+    return reply.code(err.statusCode).send({
+      code: err.code,
+      message: err.message,
+      details: err.details,
+    });
+  }
 
-    // 커스텀 AppError
-    if (err instanceof AppError) {
-      statusCode = err.statusCode;
-      code = err.code;
-      message = err.message;
-    }
+  req.log.error({ err }, "unhandled error");
+  return reply.code(500).send({ code: "INTERNAL_ERROR", message: "internal server error" });
+});
 
-    req.log.error(
-      {
-        err,
-        statusCode,
-        code,
-        path: req.url,
-        method: req.method,
-        userId: (req as any).user?.sub,
-      },
-      "request failed"
-    );
-
-    return reply.code(statusCode).send({ code, message });
-  });
 
   app.register(cors, { origin: true, credentials: true,
 methods:["GET","POST","PUT","PATCH", "DELETE", "OPTIONS"]

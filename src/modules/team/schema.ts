@@ -1,3 +1,5 @@
+import { commonErrorResponses } from "../../common/commonResponse.js";
+
 export const joinTeamSchema = {
   tags: ["team"],
   summary: "팀 참가 (joinCode)",
@@ -20,10 +22,7 @@ export const joinTeamSchema = {
         teamId: { type: "string" },
       },
     },
-    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    409: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    ...commonErrorResponses
   },
 };
 
@@ -50,5 +49,6 @@ export const getMyTeamsSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };

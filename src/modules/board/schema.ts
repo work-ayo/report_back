@@ -1,3 +1,5 @@
+import { commonErrorResponses } from "../../common/commonResponse.js";
+
 const boardShape = {
   type: "object",
   required: ["boardId", "teamId", "name", "createdAt", "updatedAt"],
@@ -114,6 +116,7 @@ export const createBoardSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -150,6 +153,7 @@ export const listBoardsSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -191,11 +195,8 @@ export const getBoardDetailSchema = {
         },
       },
     },
-
-    401: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    403: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-  },
+ ...commonErrorResponses
+     },
 };
 
 
@@ -237,6 +238,7 @@ export const updateBoardSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -255,5 +257,6 @@ export const deleteBoardSchema = {
       required: ["ok"],
       properties: { ok: { type: "boolean" } },
     },
+     ...commonErrorResponses
   },
 };

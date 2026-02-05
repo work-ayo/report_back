@@ -1,3 +1,5 @@
+import { commonErrorResponses } from "../../common/commonResponse.js";
+
 const projectShape = {
   type: "object",
   required: ["projectId", "teamId", "code", "name", "price", "createdAt", "updatedAt"],
@@ -37,6 +39,7 @@ export const listProjectsSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -71,8 +74,7 @@ export const createProjectSchema = {
         project: projectShape,
       },
     },
-    400: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    409: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+   ...commonErrorResponses
   },
 };
 
@@ -95,9 +97,8 @@ export const getProjectSchema = {
         project: projectShape,
       },
     },
-    403: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
-    404: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
-  },
+     ...commonErrorResponses
+   },
 };
 
 
@@ -130,11 +131,8 @@ export const updateProjectSchema = {
         project: projectShape,
       },
     },
-    400: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    403: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
-    404: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
-    409: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
-  },
+     ...commonErrorResponses
+      },
 };
 
 export const deleteProjectSchema = {
@@ -156,7 +154,6 @@ export const deleteProjectSchema = {
         ok: { type: "boolean" },
       },
     },
-    403: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
-    404: { type: "object", required: ["code"], properties: { code: { type: "string" } } },
-  },
+     ...commonErrorResponses
+   },
 };

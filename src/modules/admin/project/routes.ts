@@ -137,6 +137,8 @@ const adminProjectRoutes: FastifyPluginAsync = async (app) => {
       if (body.teamId !== undefined && String(body.teamId).trim().length > 0) data.teamId = String(body.teamId).trim();
       if (body.code !== undefined && String(body.code).trim().length > 0) data.code = String(body.code).trim();
       if (body.name !== undefined && String(body.name).trim().length > 0) data.name = String(body.name).trim();
+      const startDate = body.startDate;
+      const endDate = body.endDate;
 
       if (body.price !== undefined) {
         const price = parsePrice(body.price);

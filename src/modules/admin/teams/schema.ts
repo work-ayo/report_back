@@ -1,3 +1,4 @@
+import { commonErrorResponses } from "../../../common/commonResponse.js";
 
 
 export const adminCreateTeamSchema = {
@@ -29,9 +30,7 @@ export const adminCreateTeamSchema = {
         },
       },
     },
-    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+   ...commonErrorResponses
   },
 };
 
@@ -52,9 +51,7 @@ export const adminDeleteTeamSchema = {
       required: ["ok"],
       properties: { ok: { type: "boolean" } },
     },
-    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    ...commonErrorResponses
   },
 };
 
@@ -87,8 +84,7 @@ export const adminAddTeamMemberSchema = {
         userId: { type: "string" },
       },
     },
-    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    409: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+     ...commonErrorResponses
   },
 };
 
@@ -110,7 +106,7 @@ export const adminRemoveTeamMemberSchema = {
       required: ["ok"],
       properties: { ok: { type: "boolean" } },
     },
-    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+   ...commonErrorResponses
   },
 };
 
@@ -138,6 +134,7 @@ export const adminListTeamsSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -182,7 +179,7 @@ export const adminListTeamMembersSchema = {
         },
       },
     },
-    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+   ...commonErrorResponses
   },
 };
 
@@ -265,10 +262,7 @@ export const adminTeamWeeklyListSchema = {
         },
       },
     },
-    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code", "message"] },
-    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code", "message"] },
-    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code", "message"] },
-    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code", "message"] },
+    ...commonErrorResponses
   },
 };
 
@@ -332,9 +326,6 @@ export const adminTeamWeeklyUserOneSchema = {
         },
       },
     },
-    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code", "message"] },
-    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code", "message"] },
-    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code", "message"] },
-    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code", "message"] },
+     ...commonErrorResponses
   },
 };

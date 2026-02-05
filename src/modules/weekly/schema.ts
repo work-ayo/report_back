@@ -1,3 +1,5 @@
+import { commonErrorResponses } from "../../common/commonResponse.js";
+
 export const getMyReportsSchema = {
   tags: ["report"],
   summary: "내 주간보고 조회 (기간)",
@@ -14,6 +16,7 @@ export const getMyReportsSchema = {
   },
   response: {
     200: { type: "object", additionalProperties: true },
+     ...commonErrorResponses
   },
 };
 
@@ -58,6 +61,7 @@ export const upsertMyReportSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };
 

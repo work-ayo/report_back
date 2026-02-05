@@ -1,3 +1,5 @@
+import { commonErrorResponses } from "../../common/commonResponse.js";
+
 export const adminCreateUserSchema = {
   tags: ["admin"],
   summary: "유저 생성 (ADMIN)",
@@ -34,10 +36,7 @@ export const adminCreateUserSchema = {
         },
       },
     },
-    409: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+    ...commonErrorResponses
   },
 };
 
@@ -80,10 +79,7 @@ export const adminSetUserRoleSchema = {
         },
       },
     },
-    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+ ...commonErrorResponses
   },
 };
 
@@ -114,6 +110,7 @@ export const adminListUsersSchema = {
         },
       },
     },
+     ...commonErrorResponses
   },
 };
 
@@ -151,7 +148,7 @@ export const adminResetPasswordSchema = {
         defaultPassword: { type: "string" },
       },
     },
-    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } } },
+    ...commonErrorResponses
   },
 };
 
@@ -172,10 +169,7 @@ export const adminDeleteUserSchema = {
       required: ["ok"],
       properties: { ok: { type: "boolean" } },
     },
-    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    403: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    404: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
+  ...commonErrorResponses
   },
 };
 

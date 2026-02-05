@@ -1,3 +1,5 @@
+import { commonErrorResponses, errorResponseSchema } from "../../common/commonResponse.js";
+
 export const signupSchema = {
   tags: ["auth"],
   summary: "회원가입",
@@ -32,8 +34,7 @@ export const signupSchema = {
         },
       },
     },
-    400: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
-    409: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
+    ...commonErrorResponses
   },
 };
 
@@ -69,8 +70,7 @@ export const loginSchema = {
         },
       },
     },
-    400: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
-    401: { type: "object", properties: { error: { type: "string" } }, required: ["error"] },
+    ...commonErrorResponses
   },
 };
 
@@ -97,14 +97,7 @@ export const meSchema = {
         },
       },
     },
-    401: {
-      type: "object",
-      required: ["code", "message"],
-      properties: {
-        code: { type: "string" },
-        message: { type: "string" },
-      },
-    },
+   ...commonErrorResponses
   },
 };
 
@@ -129,7 +122,5 @@ export const changePasswordSchema = {
       required: ["ok"],
       properties: { ok: { type: "boolean" } },
     },
-    400: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-    401: { type: "object", properties: { code: { type: "string" }, message: { type: "string" } }, required: ["code","message"] },
-  },
+    ...commonErrorResponses  },
 };

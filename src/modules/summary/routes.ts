@@ -49,21 +49,16 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
       const userId = req.user.sub as string;
       const teamId = req.query.teamId as string;
 
-      // ===== 1) projects =====
+      // ===== projects =====
       const projects = await app.prisma.project.findMany({
         where: { teamId },
         select: {
           projectId: true,
           name: true,
-          // 너 예시에 price 있었음(정수)
           price: true,
           startDate: true,
           endDate: true,
           updatedAt: true,
-
-          // 프로젝트 멤버 관계가 있으면 여기를 너 스키마에 맞춰 바꿔
-          // 예: ProjectMember { user: { userId, name, avatarUrl } }
-          // members: { select: { user: { select: { userId:true, name:true, avatarUrl:true } } } }
         },
         orderBy: { updatedAt: "desc" },
         take: 12,
@@ -85,7 +80,7 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
         };
       });
 
-      // ===== 2) KPI =====
+      // ===== KPI =====
       let activeProjects = 0;
       let dueSoonProjects = 0;
       let thisMonthAmount = 0;
@@ -100,7 +95,7 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
         }
       }
 
-      // ===== 3) myTasks / openIssues / doneThisWeek =====
+      // =====  myTasks / openIssues / doneThisWeek =====
       // 아래는 "있으면 채우고, 없으면 빈 배열/0"로 처리
       let myTasks: any[] = [];
       let openIssues = 0;
@@ -127,10 +122,8 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
             cardId: true,
             title: true,
             dueDate: true, // Date?
-            status: true, // "TODO" | "DOING" | "DONE" 등
             board: { select: { boardId: true, name: true } }, // relation
             project: { select: { projectId: true, name: true } }, // relation (없으면 제거)
-            doneAt: true, // Date? (없으면 updatedAt 기반으로 추정)
             updatedAt: true,
           },
           orderBy: [{ dueDate: "asc" }, { updatedAt: "desc" }],
@@ -145,16 +138,13 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
           projectId: c.project?.projectId ?? null,
           projectName: c.project?.name ?? null,
           dueDate: c.dueDate ? toYmd(c.dueDate) : undefined,
-          status: (c.status ?? "TODO") as "TODO" | "DOING" | "DONE",
         }));
 
-        // 열린 이슈: status가 ISSUE/BUG 같은 게 있으면 그걸로 바꾸고,
         // 없으면 TODO+DOING 중 "issue=true" 같은 플래그로 바꿔
         // 여기선 간단히 "DONE 아닌 카드"로 카운트(임시)
         openIssues = await app.prisma.card.count({
           where: {
             teamId,
-            status: { not: "DONE" },
           },
         });
 
@@ -162,9 +152,7 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
         thisWeekDoneCards = await app.prisma.card.count({
           where: {
             teamId,
-            status: "DONE",
-            // doneAt이 없으면 updatedAt으로 교체
-            doneAt: { gte: weekStart },
+            updatedAt: { gte: weekStart },
           },
         });
       } catch {
@@ -174,7 +162,7 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
         thisWeekDoneCards = 0;
       }
 
-      // ===== 4) deadlines =====
+      // ===== deadlines =====
       // 프로젝트 마감 + 카드 마감을 섞어서 가까운 순
       const deadlines: any[] = [];
 
@@ -217,7 +205,6 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
       // ===== 5) team workload =====
       let team: any[] = [];
       try {
-        // 기대: TeamMember { teamId, userId, user { userId, name, avatarUrl } }
         const members = await app.prisma.teamMember.findMany({
           where: { teamId },
           select: {
@@ -233,24 +220,23 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
         const weekStart = startOfWeekMonday(now);
 
         const activeCounts = await app.prisma.card.groupBy({
-          by: ["assigneeUserId"],
-          where: { teamId, assigneeUserId: { in: ids }, status: { not: "DONE" } },
+          by: ["createdBy"],
+          where: { teamId, createdBy: { in: ids } },
           _count: { _all: true },
         });
 
         const doneCounts = await app.prisma.card.groupBy({
-          by: ["assigneeUserId"],
-          where: { teamId, assigneeUserId: { in: ids }, status: "DONE", doneAt: { gte: weekStart } },
+          by: ["createdBy"],
+          where: { teamId, createdBy: { in: ids }, updatedAt: { gte: weekStart } },
           _count: { _all: true },
         });
 
-        const activeMap = new Map(activeCounts.map((x: any) => [x.assigneeUserId, x._count._all]));
-        const doneMap = new Map(doneCounts.map((x: any) => [x.assigneeUserId, x._count._all]));
+        const activeMap = new Map(activeCounts.map((x: any) => [x.createdBy, x._count._all]));
+        const doneMap = new Map(doneCounts.map((x: any) => [x.createdBy, x._count._all]));
 
         team = members.map((m: any) => ({
           userId: m.user.userId,
           name: m.user.name,
-          avatarUrl: m.user.avatarUrl ?? null,
           activeCardCount: activeMap.get(m.user.userId) ?? 0,
           doneThisWeekCount: doneMap.get(m.user.userId) ?? 0,
         }));
@@ -258,38 +244,6 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
         team = [];
       }
 
-      // ===== 6) activity feed =====
-      let activity: any[] = [];
-      try {
-        // 기대: Activity { id, teamId, actorUserId, verb, message, createdAt, projectId?, boardId? }
-        // 없으면 빈 배열
-        const logs = await app.prisma.activity.findMany({
-          where: { teamId },
-          select: {
-            id: true,
-            createdAt: true,
-            verb: true,
-            message: true,
-            projectId: true,
-            boardId: true,
-            actor: { select: { userId: true, name: true, avatarUrl: true } },
-          },
-          orderBy: { createdAt: "desc" },
-          take: 10,
-        });
-
-        activity = logs.map((x: any) => ({
-          id: x.id,
-          createdAt: x.createdAt.toISOString(),
-          actor: { userId: x.actor.userId, name: x.actor.name, avatarUrl: x.actor.avatarUrl ?? null },
-          verb: x.verb,
-          message: x.message,
-          projectId: x.projectId ?? null,
-          boardId: x.boardId ?? null,
-        }));
-      } catch {
-        activity = [];
-      }
 
       return reply.send({
         kpi: {
@@ -303,7 +257,6 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
         myTasks,
         deadlines: deadlinesTop,
         team,
-        activity,
       });
     }
   );

@@ -1,3 +1,5 @@
+import { commonErrorResponses } from "../../../common/commonResponse.js";
+
 const projectShape = {
   type: "object",
   required: ["projectId", "teamId", "teamName", "code", "name", "price", "createdAt", "updatedAt"],
@@ -37,16 +39,7 @@ export const adminListAllProjectsSchema = {
         },
       },
     },
-    401: {
-      type: "object",
-      required: ["code", "message"],
-      properties: { code: { type: "string" }, message: { type: "string" } },
-    },
-    403: {
-      type: "object",
-      required: ["code", "message"],
-      properties: { code: { type: "string" }, message: { type: "string" } },
-    },
+   ...commonErrorResponses
   },
 };
 
@@ -71,9 +64,7 @@ export const adminCreateProjectSchema = {
   },
   response: {
     201: { type: "object", required: ["project"], properties: { project: projectShape } },
-    409: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    400: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+    ...commonErrorResponses
   },
 };
 
@@ -102,9 +93,7 @@ export const adminUpdateProjectSchema = {
   },
   response: {
     200: { type: "object", required: ["project"], properties: { project: projectShape } },
-    404: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    409: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
-    400: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" } } },
+   ...commonErrorResponses
   },
 };
 
@@ -119,10 +108,6 @@ export const adminDeleteProjectSchema = {
   },
   response: {
     200: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } },
-    404: {
-      type: "object",
-      required: ["code", "message"],
-      properties: { code: { type: "string" }, message: { type: "string" } },
-    },
+    ...commonErrorResponses
   },
 };

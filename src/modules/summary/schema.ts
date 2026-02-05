@@ -1,3 +1,5 @@
+import { commonErrorResponses } from "../../common/commonResponse.js";
+
 export const homeSummarySchema = {
   description: "홈 대시보드 요약 데이터",
   tags: ["summary"],
@@ -14,7 +16,7 @@ export const homeSummarySchema = {
     200: {
       type: "object",
       additionalProperties: false,
-      required: ["kpi", "projects", "myTasks", "deadlines", "team", "activity"],
+      required: ["kpi", "projects", "myTasks", "deadlines", "team"],
       properties: {
         kpi: {
           type: "object",
@@ -40,26 +42,8 @@ export const homeSummarySchema = {
         myTasks: { type: "array" },
         deadlines: { type: "array" },
         team: { type: "array" },
-        activity: { type: "array" },
       },
     },
-    400: {
-      type: "object",
-      additionalProperties: false,
-      required: ["code", "message"],
-      properties: { code: { type: "string" }, message: { type: "string" } },
-    },
-    401: {
-      type: "object",
-      additionalProperties: false,
-      required: ["code", "message"],
-      properties: { code: { type: "string" }, message: { type: "string" } },
-    },
-    403: {
-      type: "object",
-      additionalProperties: false,
-      required: ["code", "message"],
-      properties: { code: { type: "string" }, message: { type: "string" } },
-    },
+     ...commonErrorResponses
   },
 } as const;
