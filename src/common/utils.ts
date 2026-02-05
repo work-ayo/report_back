@@ -63,3 +63,44 @@ export function labelDDay(dDay: number): string {
   if (dDay > 0) return `D-${dDay}`;
   return `D+${Math.abs(dDay)}`;
 }
+
+export function iso(d: Date | null | undefined) {
+  return d ? d.toISOString() : null;
+}
+
+// formbody로 오면 string일 수 있어서 안전 파싱
+export function parsePrice(v: any): number | null {
+  if (v === undefined || v === null || v === "") return 0;
+  const n = typeof v === "number" ? v : Number(String(v).trim());
+  if (!Number.isFinite(n)) return null;
+  if (!Number.isInteger(n)) return null;
+  if (n < 0) return null;
+  return n;
+}
+
+
+// YYYY-MM-DD 파서(유효성 검사 포함)
+export function parseYmdOrInvalid(v?: any): Date | null | "INVALID" {
+  const s = String(v ?? "").trim();
+  if (s === "") return null;
+
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return "INVALID";
+
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return "INVALID";
+
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+export function parsePriceBigInt(v: any): bigint | null {
+  const s = String(v ?? "0").replace(/,/g, "").trim();
+  if (s === "") return 0n;
+  if (!/^\d+$/.test(s)) return null;
+  return BigInt(s);
+}

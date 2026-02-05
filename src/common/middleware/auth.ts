@@ -1,4 +1,4 @@
-import type { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 /**
  * JWT 인증 (app.decorate("authenticate") 사용)
@@ -68,6 +68,78 @@ export function requireTeamMember(app: any, getTeamId: (req: any) => string) {
     });
 
     if (!member) {
+      return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
+    }
+  };
+}
+
+
+
+/**
+ * 내가 쓴 카드인지 확인 (ADMIN bypass)
+ * - requireAuth 이후 실행 전제
+ * - cardId는 기본적으로 req.params.cardId에서 읽음
+ */
+
+export function requireMyColumn(app: FastifyInstance, getColumnId: (req: any) => string = (req) => String(req.params?.columnId ?? "")) {
+  return async (req: any, reply: any) => {
+    const user = await getActiveUserOrReply(app, req, reply);
+    if (!user) return;
+
+    const columnId = String(getColumnId(req) ?? "").trim();
+    if (!columnId) {
+      return reply.status(400).send({ code: "COLUMNID_REQUIRED", message: "column required" });
+    }
+
+    // ADMIN은 bypass
+    if (user.globalRole === "ADMIN") return;
+
+    const column = await app.prisma.column.findUnique({
+      where: { columnId },
+      select: { columnId: true, createdBy: true },
+    });
+
+    if (!column) {
+      return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
+    }
+
+    if (column.createdBy.userId !== user.userId) {
+      return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
+    }
+  };
+}
+
+
+
+/**
+ * 내가 쓴 카드인지 확인 (ADMIN bypass)
+ * - requireAuth 이후 실행 전제
+ * - cardId는 기본적으로 req.params.cardId에서 읽음
+ */
+
+export function requireMyCard(app: FastifyInstance, getCardId: (req: any) => string = (req) => String(req.params?.cardId ?? "")) {
+  return async (req: any, reply: any) => {
+    const user = await getActiveUserOrReply(app, req, reply);
+    if (!user) return;
+
+    const cardId = String(getCardId(req) ?? "").trim();
+    if (!cardId) {
+      return reply.status(400).send({ code: "CARDID_REQUIRED", message: "cardId required" });
+    }
+
+    // ADMIN은 bypass
+    if (user.globalRole === "ADMIN") return;
+
+    const card = await app.prisma.card.findUnique({
+      where: { cardId },
+      select: { cardId: true, createdBy: true },
+    });
+
+    if (!card) {
+      return reply.status(404).send({ code: "CARD_NOT_FOUND", message: "card not found" });
+    }
+
+    if (card.createdBy.userId !== user.userId) {
       return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
     }
   };

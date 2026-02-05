@@ -48,7 +48,7 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
       const nextOrder = (last?.order ?? 0) + 1;
 
       const column = await app.prisma.column.create({
-        data: { boardId, name,  order: nextOrder },
+        data: { boardId, name,  order: nextOrder,createdByUserId:userId },
         select: { columnId: true, boardId: true, name: true,  order: true },
       });
 

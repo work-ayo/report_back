@@ -1,16 +1,6 @@
 import { commonErrorResponses } from "../../common/commonResponse.js";
 
-const boardShape = {
-  type: "object",
-  required: ["boardId", "teamId", "name", "createdAt", "updatedAt"],
-  properties: {
-    boardId: { type: "string" },
-    teamId: { type: "string" },
-    name: { type: "string" },
-    createdAt: { type: "string" },
-    updatedAt: { type: "string" },
-  },
-};
+
 
 const columnShape = {
   type: "object",
@@ -43,6 +33,18 @@ const createdByShape = {
   properties: {
     userId: { type: "string" },
     name: { type: "string" },
+  },
+};
+const boardShape = {
+  type: "object",
+  required: ["boardId", "teamId", "name", "createdAt", "updatedAt"],
+  properties: {
+    boardId: { type: "string" },
+    teamId: { type: "string" },
+    name: { type: "string" },
+      createdBy: createdByShape,
+    createdAt: { type: "string" },
+    updatedAt: { type: "string" },
   },
 };
 

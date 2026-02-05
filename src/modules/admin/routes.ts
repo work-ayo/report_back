@@ -28,13 +28,41 @@ const adminRoutes: FastifyPluginAsync = async (app) => {
           department: true,
           globalRole: true,
           isActive: true,
+          // 유저가 속한 팀들
+          memberships: {
+            select: {
+              role: true, // teamMember에 role 컬럼 있으면
+              team: {
+                select: {
+                  teamId: true,
+                  name: true,
+                },
+              },
+            },
+          },
         },
         orderBy: { createdAt: "asc" },
       });
 
-      return reply.send({ users });
+      // 응답 shape 깔끔하게: teamMembers -> teams
+      const mapped = users.map((u) => ({
+        userId: u.userId,
+        id: u.id,
+        name: u.name,
+        department: u.department,
+        globalRole: u.globalRole,
+        isActive: u.isActive,
+        teams: (u.memberships ?? []).map((m) => ({
+          teamId: m.team.teamId,
+          name: m.team.name,
+          role: m.role ?? null,
+        })),
+      }));
+
+      return reply.send({ users: mapped });
     }
   );
+
 
   // 비밀번호 초기화
   app.post(

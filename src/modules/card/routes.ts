@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { requireAuth, assertTeamMemberByBoard } from "../../common/middleware/auth.js";
+import { requireAuth, assertTeamMemberByBoard, requireMyCard } from "../../common/middleware/auth.js";
 import { createCardSchema, updateCardSchema, deleteCardSchema, moveCardSchema } from "./schema.js";
 
 function iso(d: Date) {
@@ -131,7 +131,7 @@ app.post(
 
 app.patch(
   "/card/:cardId",
-  { preHandler: [requireAuth], schema: updateCardSchema },
+  { preHandler: [requireAuth,requireMyCard(app,(req:any)=>req.params.cardId)], schema: updateCardSchema },
   async (req: any, reply) => {
     const userId = req.user.sub as string;
     const cardId = req.params.cardId as string;
@@ -140,7 +140,7 @@ app.patch(
       title?: string;
       content?: string;
       projectId?: string; // optional
-      dueDate?: string;   // ISO string, ""이면 해제
+      dueDate?: string;  
     };
 
     const existing = await app.prisma.card.findUnique({
@@ -215,7 +215,7 @@ app.patch(
         columnId: true,
         title: true,
         content: true,
-        projectId: true,
+        project: true,
         dueDate: true,
         order: true,
         createdAt: true,
@@ -237,7 +237,7 @@ app.patch(
   // 카드 삭제
   app.delete(
     "/card/:cardId",
-    { preHandler: [requireAuth], schema: deleteCardSchema },
+    { preHandler: [requireAuth,requireMyCard(app,(req:any)=>req.params.cardId)], schema: deleteCardSchema },
     async (req: any, reply) => {
       const userId = req.user.sub as string;
       const cardId = req.params.cardId as string;
@@ -276,7 +276,7 @@ app.patch(
   // 카드 이동/정렬
 app.patch(
   "/card/:cardId/move",
-  { preHandler: [requireAuth], schema: moveCardSchema },
+   { preHandler: [requireAuth,requireMyCard(app,(req:any)=>req.params.cardId)], schema: moveCardSchema },
   async (req: any, reply) => {
     const cardId = String(req.params.cardId ?? "");
     const toColumnId = String(req.body?.toColumnId ?? "");

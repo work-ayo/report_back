@@ -54,9 +54,9 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
         // 기본 컬럼 3개
        await tx.column.createMany({
       data: [
-              { boardId: created.boardId, name: "To Do", order: 1 },
-              { boardId: created.boardId, name: "In Progress", order: 2 },
-              { boardId: created.boardId, name: "Done", order: 3 },
+              { boardId: created.boardId, name: "TO DO", order: 1 },
+              { boardId: created.boardId, name: "IN PROGRESS", order: 2 },
+              { boardId: created.boardId, name: "DONE", order: 3 },
             ],
           });
 
@@ -81,7 +81,7 @@ app.get(
         teamId: true,
         name: true,
         createdByUserId: true,
-      
+        createdBy:true,
         createdAt: true,
         updatedAt: true,
       },

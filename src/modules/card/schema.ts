@@ -1,3 +1,4 @@
+import { describe } from "zod/v4/core";
 import { commonErrorResponses } from "../../common/commonResponse.js";
 
 export const createCardSchema = {
@@ -61,7 +62,8 @@ export const updateCardSchema = {
     properties: {
       title: { type: "string", minLength: 1, maxLength: 120, default: "" },
       content: { type: "string", default: "" },
-     dueDate:{type:"string", default:""}
+     dueDate:{type:"string", default:"",description:"YYYY-MM-DD"},
+        projectId:{type:"string",default:""},
     },
   },
   response: {
@@ -78,7 +80,8 @@ export const updateCardSchema = {
             columnId: { type: "string" },
             title: { type: "string" },
             content: { type: ["string", "null"] },
-            dueDate:{type:"string"},
+            dueDate:{type:"string",description:"YYYY-MM-DD"},
+            project:{stype:"string"},
             order: { type: "integer" },
             createdByUserId: { type: "string" },
             createdAt: { type: "string" },

@@ -19,55 +19,49 @@ enum TeamRole {
 }
 
 model User {
-  // DB PK (해시/랜덤)
-  userId String @id @default(cuid())
-
-  // 로그인용 아이디 
-  id String @unique
-
-  // 비밀번호
-  password String
-
-  // 표시 이름
-  name       String
-  department String? @db.VarChar(100)
-
+  userId     String     @id @default(cuid()) @db.VarChar(32)
+  id         String     @unique @db.VarChar(50)
+  password   String     @db.VarChar(255)
+  name       String     @db.VarChar(100)
+  department String?    @db.VarChar(100)
   globalRole GlobalRole @default(USER)
-
-  isActive    Boolean   @default(true)
+  isActive   Boolean    @default(true)
   lastLoginAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships   TeamMember[]
-  createdTeams  Team[]         @relation("TeamCreator")
-  reports       WeeklyReport[]
-  boardsCreated Board[]
-  cardsCreated  Card[]         @relation("CardCreator")
+  memberships    TeamMember[]
+  createdTeams   Team[]        @relation("TeamCreator")
+  reports        WeeklyReport[]
+  boardsCreated  Board[]
+  cardsCreated   Card[]        @relation("CardCreator")
+
+  columnsCreated  Column[]   @relation("ColumnCreator")
+  projectsCreated Project[]  @relation("ProjectCreator")
 }
 
 model Team {
-  teamId   String @id @default(cuid())
-  name     String
-  joinCode String @unique
+  teamId   String @id @default(cuid()) @db.VarChar(32)
+  name     String @db.VarChar(100)
+  joinCode String @unique @db.VarChar(32)
 
-  createdByUserId String?
+  createdByUserId String? @db.VarChar(32)
   createdBy       User?   @relation("TeamCreator", fields: [createdByUserId], references: [userId], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members TeamMember[]
-  reports WeeklyReport[]
-  boards  Board[]
+  members  TeamMember[]
+  reports  WeeklyReport[]
+  boards   Board[]
   projects Project[]
 }
 
 model TeamMember {
-  id       String   @id @default(cuid())
-  teamId   String
-  userId   String
+  id       String   @id @default(cuid()) @db.VarChar(32)
+  teamId   String   @db.VarChar(32)
+  userId   String   @db.VarChar(32)
   role     TeamRole @default(MEMBER)
   joinedAt DateTime @default(now())
 
@@ -80,9 +74,9 @@ model TeamMember {
 }
 
 model WeeklyReport {
-  reportId String @id @default(cuid())
-  teamId   String
-  userId   String
+  reportId String @id @default(cuid()) @db.VarChar(32)
+  teamId   String @db.VarChar(32)
+  userId   String @db.VarChar(32)
 
   // 주의 월요일 00:00(UTC) 기준
   weekStart DateTime
@@ -104,10 +98,10 @@ model WeeklyReport {
 }
 
 model Board {
-  boardId         String @id @default(cuid())
-  teamId          String
-  name            String
-  createdByUserId String
+  boardId         String @id @default(cuid()) @db.VarChar(32)
+  teamId          String @db.VarChar(32)
+  name            String @db.VarChar(120)
+  createdByUserId String @db.VarChar(32)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -122,61 +116,69 @@ model Board {
 }
 
 model Column {
-  columnId String       @id @default(cuid())
-  boardId  String
-  name     String
+  columnId String @id @default(cuid()) @db.VarChar(32)
+  boardId  String @db.VarChar(32)
+  name     String @db.VarChar(80)
   order    Int
+
+  createdByUserId String? @db.VarChar(32)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  board Board  @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
+  board Board @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
   cards Card[]
+
+  createdBy User? @relation("ColumnCreator", fields: [createdByUserId], references: [userId], onDelete: SetNull)
 
   @@unique([boardId, order])
   @@index([boardId])
+  @@index([createdByUserId])
 }
 
 model Project {
-  projectId String @id @default(cuid())
+  projectId String @id @default(cuid()) @db.VarChar(32)
 
-  teamId String
-  code   String
-  name   String
+  teamId String @db.VarChar(32)
+  code   String @db.VarChar(50)
+  name   String @db.VarChar(200)
 
   // 원 단위(정수)
-  price  Int @default(0)
+  price BigInt @default(0)
 
-  //프로젝트 시작, 마감일
+  // 프로젝트 시작, 마감일
   startDate DateTime?
-  endDate DateTime?
+  endDate   DateTime?
+
+  createdByUserId String? @db.VarChar(32)
+  createdBy       User?   @relation("ProjectCreator", fields: [createdByUserId], references: [userId], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  team  Team   @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
+  team  Team  @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
   cards Card[]
 
   @@unique([teamId, code])
   @@index([teamId])
+  @@index([createdByUserId])
 }
 
 model Card {
-  cardId   String @id @default(cuid())
-  boardId  String
-  columnId String
+  cardId   String @id @default(cuid()) @db.VarChar(32)
+  boardId  String @db.VarChar(32)
+  columnId String @db.VarChar(32)
 
-  projectId String?
+  projectId String?  @db.VarChar(32)
   project   Project? @relation(fields: [projectId], references: [projectId], onDelete: SetNull)
 
-  title   String
+  title   String  @db.VarChar(200)
   content String? @db.Text
   dueDate DateTime?
 
-  order   Int
+  order Int
 
-
-  createdByUserId String
+  createdByUserId String @db.VarChar(32)
   createdBy       User   @relation("CardCreator", fields: [createdByUserId], references: [userId], onDelete: Cascade)
 
   createdAt DateTime @default(now())

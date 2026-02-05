@@ -1,21 +1,27 @@
 import { commonErrorResponses } from "../../common/commonResponse.js";
 
+// 공통: price는 BigInt라 API에서는 string(digits)로 전달
 const projectShape = {
   type: "object",
-  required: ["projectId", "teamId", "code", "name", "price", "createdAt", "updatedAt"],
+  additionalProperties: false,
+  required: ["projectId", "teamId", "code", "name", "price", "startDate", "endDate", "createdAt", "updatedAt"],
   properties: {
     projectId: { type: "string" },
     teamId: { type: "string" },
     code: { type: "string" },
     name: { type: "string" },
-    price: { type: "integer", minimum: 0 },
-    startDate:{type:"string"},
-    endDate:{type:"string"},
+
+    // BigInt 직렬화 대응
+    price: { type: "string", pattern: "^[0-9]+$" },
+    createdByUserId: { type: ["string", "null"] },
+    createdBy:{type:"string"},
+    startDate: { type: "string" },
+    endDate: { type: "string" },
+
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },
 };
-
 
 export const listProjectsSchema = {
   tags: ["projects"],
@@ -23,14 +29,17 @@ export const listProjectsSchema = {
   security: [{ bearerAuth: [] }],
   params: {
     type: "object",
+    additionalProperties: false,
     required: ["teamId"],
     properties: {
-      teamId: { type: "string" },
+      teamId: { type: "string", minLength: 1 },
+      
     },
   },
   response: {
     200: {
       type: "object",
+      additionalProperties: false,
       required: ["projects"],
       properties: {
         projects: {
@@ -39,42 +48,52 @@ export const listProjectsSchema = {
         },
       },
     },
-     ...commonErrorResponses
+    ...commonErrorResponses,
   },
 };
-
 
 export const createProjectSchema = {
   tags: ["projects"],
   summary: "프로젝트 생성 (팀원)",
   security: [{ bearerAuth: [] }],
-  consumes: ["application/x-www-form-urlencoded"],
+
+  // 프론트에서 JSON으로 보내는 흐름이면 이 consumes는 빼는 게 안전
+  // consumes: ["application/x-www-form-urlencoded"],
+
   params: {
     type: "object",
+    additionalProperties: false,
     required: ["teamId"],
     properties: {
-      teamId: { type: "string" },
+      teamId: { type: "string", minLength: 1 },
     },
   },
   body: {
     type: "object",
-    required: ["code", "name"],
     additionalProperties: false,
+    required: ["code", "name"],
     properties: {
       code: { type: "string", minLength: 1, maxLength: 40 },
       name: { type: "string", minLength: 1, maxLength: 80 },
-      price: { type: "integer", minimum: 0, default: 0 },
+
+      // BigInt -> string digits
+      price: { type: "string", pattern: "^[0-9]+$", default: "0" },
+  
+      // optional: 빈문자열 또는 YYYY-MM-DD
+      startDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
+      endDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
     },
   },
   response: {
     201: {
       type: "object",
+      additionalProperties: false,
       required: ["project"],
       properties: {
         project: projectShape,
       },
     },
-   ...commonErrorResponses
+    ...commonErrorResponses,
   },
 };
 
@@ -84,34 +103,40 @@ export const getProjectSchema = {
   security: [{ bearerAuth: [] }],
   params: {
     type: "object",
+    additionalProperties: false,
     required: ["projectId"],
     properties: {
-      projectId: { type: "string" },
+      projectId: { type: "string", minLength: 1 },
+            createdBy:{type:"string"},
     },
   },
   response: {
     200: {
       type: "object",
+      additionalProperties: false,
       required: ["project"],
       properties: {
         project: projectShape,
       },
     },
-     ...commonErrorResponses
-   },
+    ...commonErrorResponses,
+  },
 };
-
 
 export const updateProjectSchema = {
   tags: ["projects"],
   summary: "프로젝트 수정",
   security: [{ bearerAuth: [] }],
-  consumes: ["application/x-www-form-urlencoded"],
+
+  // 프론트 JSON 기준이면 제거 권장
+  // consumes: ["application/x-www-form-urlencoded"],
+
   params: {
     type: "object",
+    additionalProperties: false,
     required: ["projectId"],
     properties: {
-      projectId: { type: "string" },
+      projectId: { type: "string", minLength: 1 },
     },
   },
   body: {
@@ -120,19 +145,26 @@ export const updateProjectSchema = {
     properties: {
       code: { type: "string", maxLength: 40 },
       name: { type: "string", maxLength: 80 },
-      price: { type: "integer", minimum: 0 },
+
+      // BigInt -> string digits
+      price: { type: "string", pattern: "^[0-9]+$" },
+
+      // optional ("" 허용)
+      startDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
+      endDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
     },
   },
   response: {
     200: {
       type: "object",
+      additionalProperties: false,
       required: ["project"],
       properties: {
         project: projectShape,
       },
     },
-     ...commonErrorResponses
-      },
+    ...commonErrorResponses,
+  },
 };
 
 export const deleteProjectSchema = {
@@ -141,19 +173,21 @@ export const deleteProjectSchema = {
   security: [{ bearerAuth: [] }],
   params: {
     type: "object",
+    additionalProperties: false,
     required: ["projectId"],
     properties: {
-      projectId: { type: "string" },
+      projectId: { type: "string", minLength: 1 },
     },
   },
   response: {
     200: {
       type: "object",
+      additionalProperties: false,
       required: ["ok"],
       properties: {
         ok: { type: "boolean" },
       },
     },
-     ...commonErrorResponses
-   },
+    ...commonErrorResponses,
+  },
 };

@@ -9,7 +9,7 @@ const projectShape = {
     teamName: { type: "string" },
     code: { type: "string" },
     name: { type: "string" },
-    price: { type: "integer", minimum: 0, default: 0 },
+     price: { type: "string", pattern: "^[0-9]+$", default: "0" },
     startDate:{type:"string"},
     endDate:{type:"string"},
     createdAt: { type: "string" },
@@ -42,7 +42,6 @@ export const adminListAllProjectsSchema = {
    ...commonErrorResponses
   },
 };
-
 export const adminCreateProjectSchema = {
   tags: ["admin/projects"],
   summary: "프로젝트 생성 (ADMIN)",
@@ -56,7 +55,8 @@ export const adminCreateProjectSchema = {
       teamId: { type: "string", default: "" },
       code: { type: "string", minLength: 1, maxLength: 40, default: "" },
       name: { type: "string", minLength: 1, maxLength: 80, default: "" },
-      price: { type: "integer", minimum: 0, default: 0 },
+
+      price: { type: "string", pattern: "^[0-9]+$", default: "0" },
 
       startDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
       endDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
@@ -64,7 +64,7 @@ export const adminCreateProjectSchema = {
   },
   response: {
     201: { type: "object", required: ["project"], properties: { project: projectShape } },
-    ...commonErrorResponses
+    ...commonErrorResponses,
   },
 };
 
@@ -85,7 +85,7 @@ export const adminUpdateProjectSchema = {
       teamId: { type: "string", default: "" },
       code: { type: "string", maxLength: 40, default: "" },
       name: { type: "string", maxLength: 80, default: "" },
-      price: { type: "integer", minimum: 0, default: 0 },
+     price: { type: "string", pattern: "^[0-9]+$", default: "0" },
 
       startDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
       endDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },

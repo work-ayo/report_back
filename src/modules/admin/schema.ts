@@ -97,7 +97,7 @@ export const adminListUsersSchema = {
           type: "array",
           items: {
             type: "object",
-            required: ["userId", "id", "name", "department", "globalRole", "isActive"],
+            required: ["userId", "id", "name", "department", "globalRole", "isActive", "teams"],
             properties: {
               userId: { type: "string" },
               id: { type: "string" },
@@ -105,14 +105,27 @@ export const adminListUsersSchema = {
               department: { type: ["string", "null"] },
               globalRole: { type: "string" },
               isActive: { type: "boolean" },
+              teams: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["teamId", "name", "role"],
+                  properties: {
+                    teamId: { type: "string" },
+                    name: { type: "string" },
+                    role: { type: ["string", "null"] }, // 없으면 null로
+                  },
+                },
+              },
             },
           },
         },
       },
     },
-     ...commonErrorResponses
+    ...commonErrorResponses,
   },
 };
+
 
 // 비밀번호 초기화
 export const adminResetPasswordSchema = {
