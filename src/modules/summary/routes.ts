@@ -8,7 +8,11 @@ function toYmd(d: Date): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
+function addDays(d: Date, days: number): Date {
+  const out = new Date(d);
+  out.setDate(out.getDate() + days);
+  return out;
+}
 function parseYmd(ymd: string): Date {
   const [y, m, d] = ymd.split("-").map((x) => Number(x));
   const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
@@ -132,13 +136,18 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
       where: { board: { teamId } },
     });
 
-    const thisWeekDoneCards = await app.prisma.card.count({
-      where: {
-        board: { teamId },
-        createdAt: { gte: weekStart }, // 임시: "이번주 생성"
-      },
-    });
+    // 월요일 00:00 (local)
+const weekEndExcl = addDays(weekStart, 7); 
 
+const thisWeekDoneCards = await app.prisma.card.count({
+  where: {
+    board: { teamId },
+    dueDate: {
+      gte: weekStart,
+      lt: weekEndExcl,
+    },
+  },
+});
     // ===== deadlines =====
     const deadlines: any[] = [];
 
@@ -194,7 +203,11 @@ const homeRoutes: FastifyPluginAsync = async (app) => {
 
     const weekCounts = await app.prisma.card.groupBy({
       by: ["createdByUserId"],
-      where: { board: { teamId }, createdByUserId: { in: ids }, createdAt: { gte: weekStart } },
+      where: { board: { teamId }, createdByUserId: { in: ids },  
+      dueDate: {
+      gte: weekStart,
+      lt: weekEndExcl,
+    }, },
       _count: { _all: true },
     });
 

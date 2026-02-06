@@ -43,13 +43,13 @@ app.post(
       title: string;
       content?: string;
       projectId?: string;
-      dueDate?: string; // ISO string
+      dueDate?: string; // ISO string or ""
     };
 
-    const columnId = body.columnId.trim();
-    const title = body.title.trim();
-    const content = (body.content ?? "").trim();
-    const projectId = (body.projectId ?? "").trim() || null;
+    const columnId = String(body.columnId ?? "").trim();
+    const title = String(body.title ?? "").trim();
+    const content = String(body.content ?? "").trim();
+    const projectId = String(body.projectId ?? "").trim() || null;
 
     const dueDate = parseIsoDateOrNull(body.dueDate);
     if (body.dueDate && !dueDate) {
@@ -62,18 +62,15 @@ app.post(
     });
     if (!column) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
 
-    // 팀 멤버/ADMIN 체크
     const auth = await assertTeamMemberByBoard(app, userId, column.boardId);
     if (!auth.ok) return reply.status(auth.status).send({ code: auth.code, message: auth.message });
 
-    // 보드의 teamId 가져오기(프로젝트 검증에 필요)
     const board = await app.prisma.board.findUnique({
       where: { boardId: column.boardId },
       select: { teamId: true },
     });
     if (!board) return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
 
-    // projectId가 있으면 같은 팀 프로젝트인지 확인
     if (projectId) {
       const project = await app.prisma.project.findUnique({
         where: { projectId },
@@ -85,7 +82,6 @@ app.post(
       }
     }
 
-    // 해당 컬럼의 마지막 order + 1
     const last = await app.prisma.card.findFirst({
       where: { columnId },
       select: { order: true },
@@ -100,7 +96,7 @@ app.post(
         title,
         content: content.length > 0 ? content : null,
         projectId,
-        dueDate, // Date | null
+        dueDate,
         order: nextOrder,
         createdByUserId: userId,
       },
@@ -110,17 +106,47 @@ app.post(
         columnId: true,
         title: true,
         content: true,
+        order: true,
         projectId: true,
         dueDate: true,
-        order: true,
         createdAt: true,
         updatedAt: true,
+
+        //  스키마 required 때문에 반드시 포함
+        createdByUserId: true,
+        createdBy: { select: { userId: true, id: true, name: true } },
+
+        // project도 같이 내려주려면 (BigInt 변환 필요)
+        project: {
+          select: {
+            projectId: true,
+            teamId: true,
+            code: true,
+            name: true,
+            price: true,
+            startDate: true,
+            endDate: true,
+          },
+        },
       },
     });
 
     return reply.code(201).send({
       card: {
         ...card,
+
+        // 스키마상 required면 key 자체는 반드시 존재해야 함
+        createdBy: card.createdBy ?? null,
+
+        project: card.project
+          ? {
+              ...card.project,
+              price: card.project.price.toString(),
+              startDate: card.project.startDate ? iso(card.project.startDate) : "",
+              endDate: card.project.endDate ? iso(card.project.endDate) : "",
+            }
+          : null,
+
         dueDate: card.dueDate ? iso(card.dueDate) : null,
         createdAt: iso(card.createdAt),
         updatedAt: iso(card.updatedAt),
@@ -206,31 +232,45 @@ app.patch(
       return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
     }
 
-    const card = await app.prisma.card.update({
-      where: { cardId },
-      data,
-      select: {
-        cardId: true,
-        boardId: true,
-        columnId: true,
-        title: true,
-        content: true,
-        project: true,
-        dueDate: true,
-        order: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+      const card = await app.prisma.card.update({
+        where: { cardId },
+        data,
+        select: {
+          cardId: true,
+          boardId: true,
+          columnId: true,
+          title: true,
+          content: true,
+          dueDate: true,
+          order: true,
+          createdAt: true,
+          updatedAt: true,
 
-    return reply.send({
-      card: {
-        ...card,
-        dueDate: card.dueDate ? iso(card.dueDate) : null,
-        createdAt: iso(card.createdAt),
-        updatedAt: iso(card.updatedAt),
-      },
-    });
+          projectId: true,
+          createdByUserId: true,
+
+          project: {
+            select: {
+              projectId: true,
+              name: true,
+              price: true, // BigInt
+            },
+          },
+        },
+      });
+
+      return reply.send({
+        card: {
+          ...card,
+          project: card.project
+            ? { ...card.project, price: card.project.price.toString() }
+            : null,
+          dueDate: card.dueDate ? iso(card.dueDate) : null,
+          createdAt: iso(card.createdAt),
+          updatedAt: iso(card.updatedAt),
+        },
+      });
+
   }
 );
 
