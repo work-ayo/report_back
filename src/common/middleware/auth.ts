@@ -236,3 +236,41 @@ export async function assertTeamMemberByBoard(app: any, userId: string, boardId:
 
   return { ok: true as const };
 }
+
+
+// projectId 수정, 삭제 접근 권한 체크
+// - read/list: 팀원 or ADMIN
+// - write(delete/update): 작성자 or ADMIN
+export async function assertProjecPatchDeltAccess(
+  app: any,
+  userId: string,
+  projectId: string,
+) {
+  const me = await app.prisma.user.findUnique({
+    where: { userId },
+    select: { globalRole: true, isActive: true },
+  });
+
+  if (!me || !me.isActive) {
+    return { ok: false as const, status: 401, code: "UNAUTHORIZED" };
+  }
+  if (me.globalRole === "ADMIN") {
+    return { ok: true as const };
+  }
+
+  const project = await app.prisma.project.findUnique({
+    where: { projectId },
+    select: { teamId: true, createdByUserId: true },
+  });
+
+  if (!project) {
+    return { ok: false as const, status: 404, code: "PROJECT_NOT_FOUND" };
+  }
+
+
+  if (project.createdByUserId !== userId) {
+    return { ok: false as const, status: 403, code: "FORBIDDEN_MY_PROJECT_ONLY" };
+  }
+  return { ok: true as const };
+
+}

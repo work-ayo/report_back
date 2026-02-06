@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { requireAuth, requireTeamMember } from "../../common/middleware/auth.js";
+import { assertProjecPatchDeltAccess, requireAuth, requireTeamMember } from "../../common/middleware/auth.js";
 import {
   listProjectsSchema,
   createProjectSchema,
@@ -207,104 +207,99 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
   /**
    * 프로젝트 수정
    */
-  app.patch(
-    "/projects/:projectId",
-    { preHandler: [requireAuth, requireTeamMember(app, (req: any) => req.params.teamId)], schema: updateProjectSchema },
-    async (req: any, reply) => {
-      const userId = req.user.sub as string;
-      const projectId = req.params.projectId as string;
-      const body = req.body as {
-        code?: string;
-        name?: string;
-        price?: string;      // digits string
-        startDate?: string;  // ""이면 null 처리 가능
-        endDate?: string;
-      };
+ app.patch(
+  "/projects/:projectId",
+  { preHandler: [requireAuth], schema: updateProjectSchema },
+  async (req: any, reply) => {
+    const userId = req.user.sub as string;
+    const projectId = req.params.projectId as string;
 
-      const access = await assertProjectAccess(app, userId, projectId);
-      if (!access.ok) return reply.status(access.status).send({ code: access.code });
+    const access = await assertProjecPatchDeltAccess(app, userId, projectId);
+    if (!access.ok) return reply.status(access.status).send({ code: access.code });
 
-      const data: any = {};
-      if (body.code !== undefined && String(body.code).trim()) data.code = String(body.code).trim();
-      if (body.name !== undefined && String(body.name).trim()) data.name = String(body.name).trim();
+    const body = req.body as {
+      code?: string;
+      name?: string;
+      price?: string;
+      startDate?: string;
+      endDate?: string;
+    };
 
-      if (body.price !== undefined) {
-        const p = parsePriceBigInt(body.price);
-        if (p === null) return reply.status(400).send({ code: "INVALID_PRICE", message: "invalid price" });
-        data.price = p;
-      }
+    const data: any = {};
+    if (body.code !== undefined && String(body.code).trim()) data.code = String(body.code).trim();
+    if (body.name !== undefined && String(body.name).trim()) data.name = String(body.name).trim();
 
-      if (body.startDate !== undefined) {
-        const d = parseYmdOrInvalid(body.startDate);
-        if (d === "INVALID") return reply.status(400).send({ code: "INVALID_START_DATE", message: "startDate must be YYYY-MM-DD" });
-        data.startDate = d; // Date | null
-      }
-
-      if (body.endDate !== undefined) {
-        const d = parseYmdOrInvalid(body.endDate);
-        if (d === "INVALID") return reply.status(400).send({ code: "INVALID_END_DATE", message: "endDate must be YYYY-MM-DD" });
-        data.endDate = d;
-      }
-
-      if (Object.keys(data).length === 0) {
-        return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
-      }
-
-      try {
-        const project = await app.prisma.project.update({
-          where: { projectId },
-          data,
-          select: {
-            projectId: true,
-            teamId: true,
-            code: true,
-            name: true,
-            price: true,
-            startDate: true,
-            endDate: true,
-            createdAt: true,
-            updatedAt: true,
-            createdByUserId: true,
-            createdBy: { select: { userId: true, name: true, id: true } },
-          },
-        });
-
-        return reply.send({
-          project: {
-            ...project,
-            price: project.price.toString(),
-            startDate: iso(project.startDate),
-            endDate: iso(project.endDate),
-            createdAt: iso(project.createdAt),
-            updatedAt: iso(project.updatedAt),
-          },
-        });
-      } catch {
-        return reply.status(409).send({ code: "CODE_EXISTS", message: "project code already exists" });
-      }
+    if (body.price !== undefined) {
+      const p = parsePriceBigInt(body.price);
+      if (p === null) return reply.status(400).send({ code: "INVALID_PRICE", message: "invalid price" });
+      data.price = p;
     }
 
-  );
+    if (body.startDate !== undefined) {
+      const d = parseYmdOrInvalid(body.startDate);
+      if (d === "INVALID") return reply.status(400).send({ code: "INVALID_START_DATE", message: "startDate must be YYYY-MM-DD" });
+      data.startDate = d;
+    }
+
+    if (body.endDate !== undefined) {
+      const d = parseYmdOrInvalid(body.endDate);
+      if (d === "INVALID") return reply.status(400).send({ code: "INVALID_END_DATE", message: "endDate must be YYYY-MM-DD" });
+      data.endDate = d;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
+    }
+
+    const project = await app.prisma.project.update({
+      where: { projectId },
+      data,
+      select: {
+        projectId: true,
+        teamId: true,
+        code: true,
+        name: true,
+        price: true,
+        startDate: true,
+        endDate: true,
+        createdAt: true,
+        updatedAt: true,
+        createdByUserId: true,
+        createdBy: { select: { userId: true, name: true, id: true } },
+      },
+    });
+
+    return reply.send({
+      project: {
+        ...project,
+        price: project.price.toString(),
+        startDate: iso(project.startDate),
+        endDate: iso(project.endDate),
+        createdAt: iso(project.createdAt),
+        updatedAt: iso(project.updatedAt),
+      },
+    });
+  }
+);
+
 
   /**
    * 프로젝트 삭제
    */
-  app.delete(
-    "/projects/:projectId",
-    { preHandler: [requireAuth, requireTeamMember(app, (req: any) => req.params.teamId)], schema: deleteProjectSchema },
-    async (req: any, reply) => {
-      const userId = req.user.sub as string;
-      const projectId = req.params.projectId as string;
+app.delete(
+  "/projects/:projectId",
+  { preHandler: [requireAuth], schema: deleteProjectSchema },
+  async (req: any, reply) => {
+    const userId = req.user.sub as string;
+    const projectId = req.params.projectId as string;
 
-      const access = await assertProjectAccess(app, userId, projectId);
-      if (!access.ok) {
-        return reply.status(access.status).send({ code: access.code });
-      }
+    const access = await assertProjecPatchDeltAccess(app, userId, projectId);
+    if (!access.ok) return reply.status(access.status).send({ code: access.code });
 
-      await app.prisma.project.delete({ where: { projectId } });
-      return reply.send({ ok: true });
-    }
-  );
-};
+    await app.prisma.project.delete({ where: { projectId } });
+    return reply.send({ ok: true });
+  }
+);
+}
 
 export default projectRoutes;
