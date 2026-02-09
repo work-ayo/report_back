@@ -53,4 +53,20 @@ export const getMyTeamsSchema = {
   },
 };
 
-export const leaveMyTeamSchema={}
+export const leaveMyTeamSchema = {
+  description: "내가 팀에서 탈퇴",
+  tags: ["team"],
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: "object",
+    additionalProperties: false,
+    required: ["teamId"],
+    properties: {
+      teamId: { type: "string", minLength: 1 },
+    },
+  },
+  response: {
+    204: { type: "null" },
+  },
+};
+

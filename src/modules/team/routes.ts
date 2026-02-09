@@ -55,15 +55,26 @@ const teamRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 
-  app.delete(`${base}/me`,
-    {
-      preHandler: [requireAuth, requireTeamMember(app, (req: any) => req.params.teamId)],
-      schema:leaveMyTeamSchema},
-    async(req:any, reply)=>{
+app.delete(
+  `${base}/:teamId/me`,
+  {
+    preHandler: [requireAuth, requireTeamMember(app, (req: any) => req.params.teamId)],
+    schema: leaveMyTeamSchema,
+  },
+  async (req: any, reply) => {
+    const teamId = req.params.teamId as string;
+    const userId = req.user.sub as string;
 
-      
-    }
-  )
+    await app.prisma.teamMember.delete({
+      where: {
+        teamId_userId: { teamId, userId },
+      },
+    });
+
+    return reply.code(204).send();
+  }
+);
+
 };
 
 export default teamRoutes;
