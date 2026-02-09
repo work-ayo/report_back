@@ -52,3 +52,5 @@ export const getMyTeamsSchema = {
      ...commonErrorResponses
   },
 };
+
+export const leaveMyTeamSchema={}

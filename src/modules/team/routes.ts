@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
-import { requireAuth } from "../../common/middleware/auth.js";
-import { joinTeamSchema, getMyTeamsSchema } from "./schema.js";
+import { requireAuth, requireTeamMember } from "../../common/middleware/auth.js";
+import { joinTeamSchema, getMyTeamsSchema, leaveMyTeamSchema } from "./schema.js";
 
 const base = "/teams"
 const teamRoutes: FastifyPluginAsync = async (app) => {
@@ -54,6 +54,16 @@ const teamRoutes: FastifyPluginAsync = async (app) => {
       return reply.send({ teams });
     }
   );
+
+  app.delete(`${base}/me`,
+    {
+      preHandler: [requireAuth, requireTeamMember(app, (req: any) => req.params.teamId)],
+      schema:leaveMyTeamSchema},
+    async(req:any, reply)=>{
+
+      
+    }
+  )
 };
 
 export default teamRoutes;
