@@ -92,86 +92,108 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
   );
 
   // 컬럼 삭제 + order 재정렬
-  app.delete(
-    "/columns/:columnId",
-    { preHandler: [requireAuth], schema: deleteColumnSchema },
-    async (req: any, reply) => {
-      const userId = req.user.sub as string;
-      const columnId = req.params.columnId as string;
+app.delete(
+  "/columns/:columnId",
+  { preHandler: [requireAuth], schema: deleteColumnSchema },
+  async (req: any, reply) => {
+    const userId = req.user.sub as string;
+    const columnId = req.params.columnId as string;
 
-      const existing = await app.prisma.column.findUnique({
-        where: { columnId },
-        select: { columnId: true, boardId: true },
+    const existing = await app.prisma.column.findUnique({
+      where: { columnId },
+      select: { columnId: true, boardId: true },
+    });
+    if (!existing) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
+
+    const access = await assertBoardAccess(app, userId, existing.boardId);
+    if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });
+
+    await app.prisma.$transaction(async (tx: any) => {
+      await tx.column.delete({ where: { columnId } });
+
+      const cols = await tx.column.findMany({
+        where: { boardId: existing.boardId },
+        select: { columnId: true },
+        orderBy: { order: "asc" },
       });
-      if (!existing) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
 
-      const access = await assertBoardAccess(app, userId, existing.boardId);
-      if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });
+      const ids = cols.map((c: any) => c.columnId);
 
-      await app.prisma.$transaction(async (tx: any) => {
-        await tx.column.delete({ where: { columnId } });
-
-        // 남은 컬럼 order 재정렬(1..n)
-        const cols = await tx.column.findMany({
-          where: { boardId: existing.boardId },
-          select: { columnId: true },
-          orderBy: { order: "asc" },
+      // 임시 order로 먼저 이동 (중복 방지)
+      for (let i = 0; i < ids.length; i++) {
+        await tx.column.update({
+          where: { columnId: ids[i] },
+          data: { order: -100000 - i },
         });
+      }
 
-        for (let i = 0; i < cols.length; i++) {
-          await tx.column.update({
-            where: { columnId: cols[i].columnId },
-            data: { order: i + 1 },
-          });
-        }
-      });
+      // 최종 order 재부여 (0..n-1 권장)
+      for (let i = 0; i < ids.length; i++) {
+        await tx.column.update({
+          where: { columnId: ids[i] },
+          data: { order: i },
+        });
+      }
+    });
 
-      return reply.send({ ok: true });
-    }
-  );
+    return reply.send({ ok: true });
+  }
+);
+
 
   // 컬럼 이동 (order 재정렬)
-  app.patch(
-    "/columns/:columnId/move",
-    { preHandler: [requireAuth], schema: moveColumnSchema },
-    async (req: any, reply) => {
-      const userId = req.user.sub as string;
-      const columnId = req.params.columnId as string;
-      const body = req.body as { toIndex: number };
+app.patch(
+  "/columns/:columnId/move",
+  { preHandler: [requireAuth], schema: moveColumnSchema },
+  async (req: any, reply) => {
+    const userId = req.user.sub as string;
+    const columnId = req.params.columnId as string;
+    const body = req.body as { toIndex: number };
 
-      const existing = await app.prisma.column.findUnique({
-        where: { columnId },
-        select: { columnId: true, boardId: true },
+    const existing = await app.prisma.column.findUnique({
+      where: { columnId },
+      select: { columnId: true, boardId: true },
+    });
+    if (!existing) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
+
+    const access = await assertBoardAccess(app, userId, existing.boardId);
+    if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });
+
+    const toIndex = Math.max(0, Number(body.toIndex));
+
+    await app.prisma.$transaction(async (tx: any) => {
+      const cols = await tx.column.findMany({
+        where: { boardId: existing.boardId },
+        select: { columnId: true },
+        orderBy: { order: "asc" },
       });
-      if (!existing) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
 
-      const access = await assertBoardAccess(app, userId, existing.boardId);
-      if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });
+      const ids = cols.map((c: any) => c.columnId).filter((id: string) => id !== columnId);
+      const idx = Math.max(0, Math.min(toIndex, ids.length));
+      ids.splice(idx, 0, columnId);
 
-      const toIndex = Math.max(0, Number(body.toIndex));
-
-      await app.prisma.$transaction(async (tx: any) => {
-        const cols = await tx.column.findMany({
-          where: { boardId: existing.boardId },
-          select: { columnId: true },
-          orderBy: { order: "asc" },
+      // 임시 order로 먼저 이동 (unique 충돌 방지)
+      // 기존 order가 0..n 범위라고 가정하면 음수로 밀어두는 게 안전
+      for (let i = 0; i < ids.length; i++) {
+        await tx.column.update({
+          where: { columnId: ids[i] },
+          data: { order: -100000 - i },
         });
+      }
 
-        const ids = cols.map((c: any) => c.columnId).filter((id: string) => id !== columnId);
-        const idx = Math.max(0, Math.min(toIndex, ids.length));
-        ids.splice(idx, 0, columnId);
+      //최종 order 세팅
+      for (let i = 0; i < ids.length; i++) {
+        await tx.column.update({
+          where: { columnId: ids[i] },
+          data: { order: i },
+        });
+      }
+    });
 
-        for (let i = 0; i < ids.length; i++) {
-          await tx.column.update({
-            where: { columnId: ids[i] },
-            data: { order: i + 1 },
-          });
-        }
-      });
+    return reply.send({ ok: true });
+  }
+);
 
-      return reply.send({ ok: true });
-    }
-  );
 };
 
 export default columnRoutes;

@@ -154,10 +154,10 @@ app.get(
 
 
 
-  //보드삭제
+  //보드삭제, 
 app.delete(
   "/boards/:boardId",
-  { preHandler: [requireAuth], schema: deleteBoardSchema },
+   { preHandler: [requireAuth, requireBoardOwnerOrAdmin(app)], schema: deleteBoardSchema },
   async (req: any, reply) => {
     const boardId = req.params.boardId as string;
     const userId = req.user.sub as string;
@@ -188,6 +188,8 @@ app.delete(
     return reply.send({ ok: true });
   }
 );
+
+
 app.patch(
   "/boards/:boardId",
   {

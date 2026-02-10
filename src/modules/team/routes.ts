@@ -71,7 +71,7 @@ app.delete(
       },
     });
 
-    return reply.code(204).send();
+    return reply.send({ok:true});
   }
 );
 
