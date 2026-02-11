@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { requireAuth, requireTeamMember } from "../../common/middleware/auth.js";
 import { homeSummarySchema } from "./schema.js";
-import { E } from "../../common/errors.js";
 function toYmd(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -15,7 +14,7 @@ function addDays(d: Date, days: number): Date {
 }
 function parseYmd(ymd: string): Date {
   const [y, m, d] = ymd.split("-").map((x) => Number(x));
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+    const dt = new Date((y ?? new Date().getFullYear()), (m ?? 1) - 1, d ?? 1);
   dt.setHours(0, 0, 0, 0);
   return dt;
 }

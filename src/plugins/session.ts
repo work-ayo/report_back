@@ -2,7 +2,7 @@ import fp from "fastify-plugin";
 import cookie from "@fastify/cookie";
 import session from "@fastify/session";
 import type { FastifyPluginAsync } from "fastify";
-import { env } from "../../config/env.js";
+import { env } from "../config/env.js";
 
 declare module "fastify" {
   interface Session {

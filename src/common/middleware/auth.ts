@@ -102,8 +102,8 @@ export function requireMyColumn(app: FastifyInstance, getColumnId: (req: any) =>
     if (!column) {
       return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
     }
-
-    if (column.createdBy.userId !== user.userId) {
+    
+if (!column.createdBy || column.createdBy.userId !== user.userId) {
       return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
     }
   };

@@ -39,7 +39,8 @@ export function formatKrw(amount: number) {
 
 export function parseYmd(ymd: string): Date {
   const [y, m, d] = ymd.split("-").map(Number);
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+  const dt = new Date((y ?? new Date().getFullYear()), (m ?? 1) - 1, d ?? 1);
+
   dt.setHours(0, 0, 0, 0);
   return dt;
 }

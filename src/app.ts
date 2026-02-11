@@ -23,20 +23,19 @@ import summaryRoutes from "./modules/summary/routes.js";
 export default function buildApp() {
   const app = Fastify({
     disableRequestLogging: true,
-    logger: {
-      transport:
-        process.env.NODE_ENV !== "production"
-          ? {
-              target: "pino-pretty",
-              options: {
-                colorize: true,
-                translateTime: "HH:MM:ss.l",
-                ignore: "pid,hostname,reqId",
-                singleLine: true,
-              },
-            }
-          : undefined,
-    },
+    logger:  process.env.NODE_ENV === "production"
+    ? true
+    : {
+        transport: {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            translateTime: "SYS:standard",
+            ignore: "pid,hostname",
+            singleLine: true,
+          },
+        },
+      }
   });
 
     // 요청 로그(필요한 것만)

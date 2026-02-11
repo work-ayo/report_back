@@ -20,7 +20,9 @@ const adminProjectRoutes: FastifyPluginAsync = async (app) => {
     async (req: any, reply) => {
       const q = req.query as { teamId?: string };
       const teamId = q.teamId?.trim();
-
+      
+    if (!teamId) return reply.status(400).send({ code: "TEAMID_REQUIRED", message: "teamId required" });
+    
       const projects = await app.prisma.project.findMany({
         where: {teamId},
         select: {

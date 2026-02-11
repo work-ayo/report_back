@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import argon2 from "argon2";
-import { env } from "../../../config/env.js";
+import { env } from "../../config/env.js";
 import { requireAuth, requireAdmin } from "../../common/middleware/auth.js";
 import {
   adminSetUserRoleSchema,
