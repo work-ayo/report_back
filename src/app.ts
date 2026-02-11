@@ -21,22 +21,23 @@ import projectRoutes from "./modules/project/routes.js";
 import summaryRoutes from "./modules/summary/routes.js";
 
 export default function buildApp() {
-  const app = Fastify({
-    disableRequestLogging: true,
-    logger: process.env.NODE_ENV === "production"
-      ? true
-      : {
+const app = Fastify({
+  disableRequestLogging: true,
+  logger: process.env.NODE_ENV === "production"
+    ? true
+    : {
         transport: {
           target: "pino-pretty",
           options: {
             colorize: true,
-            translateTime: "SYS:standard",
-            ignore: "pid,hostname",
+           translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
+            ignore: "pid,hostname,reqId", 
             singleLine: true,
           },
         },
-      }
-  });
+      },
+});
+
 
   // 요청 로그(필요한 것만)
   app.addHook("onResponse", async (req, reply) => {
