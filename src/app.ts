@@ -2,7 +2,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import formbody from "@fastify/formbody";
-
+import { Prisma } from "@prisma/client";
 import prismaPlugin from "./plugins/prisma.js";
 import swaggerPlugin from "./plugins/swagger.js";
 import jwtPlugin from "./plugins/jwt.js";
@@ -23,9 +23,9 @@ import summaryRoutes from "./modules/summary/routes.js";
 export default function buildApp() {
   const app = Fastify({
     disableRequestLogging: true,
-    logger:  process.env.NODE_ENV === "production"
-    ? true
-    : {
+    logger: process.env.NODE_ENV === "production"
+      ? true
+      : {
         transport: {
           target: "pino-pretty",
           options: {
@@ -38,55 +38,73 @@ export default function buildApp() {
       }
   });
 
-    // 요청 로그(필요한 것만)
-app.addHook("onResponse", async (req, reply) => {
-  const url = req.url;
+  // 요청 로그(필요한 것만)
+  app.addHook("onResponse", async (req, reply) => {
+    const url = req.url;
 
-  if (
-    url.startsWith("/docs") ||
-    url.startsWith("/health") ||
-    url.startsWith("/favicon")
-  ) {
-    return;
-  }
+    if (
+      url.startsWith("/docs") ||
+      url.startsWith("/health") ||
+      url.startsWith("/favicon")
+    ) {
+      return;
+    }
 
-  const status = reply.statusCode;
-  const userId = (req as any).user?.sub as string | undefined;
+    const status = reply.statusCode;
+    const userId = (req as any).user?.sub as string | undefined;
 
-  const msg = userId
-    ? `(${status}) ${req.method} ${url} -> (user=${userId})`
-    : `(${status}) ${req.method} ${url}`;
+    const msg = userId
+      ? `(${status}) ${req.method} ${url} -> (user=${userId})`
+      : `(${status}) ${req.method} ${url}`;
 
-  req.log.info(msg);
-});
+    req.log.info(msg);
+  });
 
 
   //전역 에러 핸들러 (응답 + 로그 통일)
-app.setErrorHandler((err, req, reply) => {
-  // fastify schema validation 에러
-  if ((err as any).validation) {
-    return reply.code(400).send({
-      code: "VALIDATION_ERROR",
-      message: "invalid request",
-      details: { validation: (err as any).validation },
-    });
-  }
+  app.setErrorHandler((err, req, reply) => {
+    //fastify schema validation 에러
+    if ((err as any).validation) {
+      return reply.code(400).send({
+        code: "VALIDATION_ERROR",
+        message: "invalid request",
+        details: { validation: (err as any).validation },
+      });
+    }
 
-  if (err instanceof AppError) {
-    return reply.code(err.statusCode).send({
-      code: err.code,
-      message: err.message,
-      details: err.details,
-    });
-  }
+    // Prisma 에러 매핑
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2002") {
+        return reply.code(409).send({ code: "CONFLICT", message: "unique constraint failed", details: err.meta });
+      }
+      if (err.code === "P2003") {
+        return reply.code(400).send({ code: "INVALID_REFERENCE", message: "foreign key constraint failed", details: err.meta });
+      }
+      if (err.code === "P2025") {
+        return reply.code(404).send({ code: "NOT_FOUND", message: "record not found", details: err.meta });
+      }
 
-  req.log.error({ err }, "unhandled error");
-  return reply.code(500).send({ code: "INTERNAL_ERROR", message: "internal server error" });
-});
+      req.log.error({ err }, "prisma known error");
+      return reply.code(500).send({ code: "INTERNAL_ERROR", message: "internal server error" });
+    }
 
+    // AppError
+    if (err instanceof AppError) {
+      return reply.code(err.statusCode).send({
+        code: err.code,
+        message: err.message,
+        details: err.details,
+      });
+    }
 
-  app.register(cors, { origin: true, credentials: true,
-methods:["GET","POST","PUT","PATCH", "DELETE", "OPTIONS"]
+    // 나머지
+    req.log.error({ err }, "unhandled error");
+    return reply.code(500).send({ code: "INTERNAL_ERROR", message: "internal server error" });
+  });
+
+  app.register(cors, {
+    origin: true, credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 
   });
   app.register(formbody);
@@ -101,7 +119,7 @@ methods:["GET","POST","PUT","PATCH", "DELETE", "OPTIONS"]
 
   app.register(summaryRoutes);
 
-  
+
 
   app.register(authRoutes);
   app.register(projectRoutes);

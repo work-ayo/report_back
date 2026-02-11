@@ -113,6 +113,7 @@ model Board {
   cards   Card[]
 
   @@index([teamId])
+  @@unique([teamId, name])
 }
 
 model Column {
@@ -132,6 +133,7 @@ model Column {
   createdBy User? @relation("ColumnCreator", fields: [createdByUserId], references: [userId], onDelete: SetNull)
 
   @@unique([boardId, order])
+  @@unique([boardId, name]) //같은 보드 안에서 이름 중복 불가
   @@index([boardId])
   @@index([createdByUserId])
 }
@@ -160,6 +162,7 @@ model Project {
   cards Card[]
 
   @@unique([teamId, code])
+  @@unique([teamId, name])
   @@index([teamId])
   @@index([createdByUserId])
 }

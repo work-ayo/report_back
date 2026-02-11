@@ -8,6 +8,8 @@ import {
 } from "./schema.js";
 
 import {iso, parsePrice, parseYmdOrInvalid} from "../../../common/utils.js";
+import { Prisma } from "@prisma/client";
+import { AppError } from "../../../common/errors.js";
 
 
 const adminProjectRoutes: FastifyPluginAsync = async (app) => {
@@ -18,27 +20,26 @@ const adminProjectRoutes: FastifyPluginAsync = async (app) => {
     "/admin/projects",
     { preHandler: adminPre, schema: adminListAllProjectsSchema },
     async (req: any, reply) => {
-      const q = req.query as { teamId?: string };
-      const teamId = q.teamId?.trim();
-      
-    if (!teamId) return reply.status(400).send({ code: "TEAMID_REQUIRED", message: "teamId required" });
-    
-      const projects = await app.prisma.project.findMany({
-        where: {teamId},
-        select: {
-          projectId: true,
-          teamId: true,
-          code: true,
-          name: true,
-          price: true,
-          startDate:true,
-          endDate:true,
-          createdAt: true,
-          updatedAt: true,
-          team: { select: { name: true } },
-        },
-        orderBy: [{ teamId: "asc" }, { createdAt: "desc" }],
-      });
+    const q = req.query as { teamId?: string };
+    const teamId = q.teamId?.trim() || undefined;
+
+    const projects = await app.prisma.project.findMany({
+      ...(teamId ? { where: { teamId } } : {}), //없으면 where 자체를 안 넣음
+      select: {
+        projectId: true,
+        teamId: true,
+        code: true,
+        name: true,
+        price: true,
+        startDate: true,
+        endDate: true,
+        createdAt: true,
+        updatedAt: true,
+        team: { select: { name: true } },
+      },
+      orderBy: [{ teamId: "asc" }, { createdAt: "desc" }],
+    });
+
 
       return reply.send({
         projects: projects.map((p: any) => ({
@@ -58,6 +59,7 @@ const adminProjectRoutes: FastifyPluginAsync = async (app) => {
   );
 
   // 생성 (ADMIN)
+
 app.post(
   "/admin/projects",
   { preHandler: adminPre, schema: adminCreateProjectSchema },
@@ -84,7 +86,14 @@ app.post(
       return reply.status(400).send({ code: "INVALID_PRICE", message: "price must be a non-negative integer" });
     }
 
-    // 날짜 파싱: ""이면 null, 값 있으면 YYYY-MM-DD 검증
+    // DB BIGINT 범위를 체크해야 함
+    // signed BIGINT 최대: 9,223,372,036,854,775,807
+    // 만약 DB가 BIGINT면 여기서 컷:
+    const MAX_BIGINT = 9223372036854775807n;
+    if (typeof price === "bigint" && price > MAX_BIGINT) {
+      return reply.status(400).send({ code: "PRICE_TOO_LARGE", message: "price is too large" });
+    }
+
     const startDate = parseYmdOrInvalid(body.startDate);
     if (startDate === "INVALID") {
       return reply.status(400).send({ code: "INVALID_START_DATE", message: "startDate must be YYYY-MM-DD" });
@@ -102,14 +111,7 @@ app.post(
 
     try {
       const project = await app.prisma.project.create({
-        data: {
-          teamId,
-          code,
-          name,
-          price,          // parsePrice가 BigInt를 반환하도록 맞추는 걸 추천
-          startDate,      // Date | null
-          endDate,        // Date | null
-        },
+        data: { teamId, code, name, price, startDate, endDate },
         select: {
           projectId: true,
           teamId: true,
@@ -137,12 +139,17 @@ app.post(
           updatedAt: iso(project.updatedAt),
         },
       });
-    } catch {
-      return reply.status(409).send({ code: "CODE_EXISTS", message: "project code already exists" });
+    } catch (e) {
+       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const target = Array.isArray((e.meta as any)?.target) ? (e.meta as any).target.join(",") : String((e.meta as any)?.target ?? "");
+        if (target.includes("code")) throw new AppError(409, "CODE_EXISTS", "project code already exists");
+        if (target.includes("name")) throw new AppError(409, "NAME_EXISTS", "project name already exists in this team");
+        throw new AppError(409, "DUPLICATE", "duplicate project");
+      }
+      throw e; // 나머지는 전역으로
+      }
     }
-  }
 );
-
 
   // 수정 (ADMIN)
 app.patch(
@@ -236,8 +243,14 @@ app.patch(
           updatedAt: iso(project.updatedAt),
         },
       });
-    } catch {
-      return reply.status(409).send({ code: "CODE_EXISTS", message: "project code already exists" });
+    } catch(e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+    const target = Array.isArray((e.meta as any)?.target) ? (e.meta as any).target.join(",") : String((e.meta as any)?.target ?? "");
+    if (target.includes("code")) throw new AppError(409, "CODE_EXISTS", "project code already exists");
+    if (target.includes("name")) throw new AppError(409, "NAME_EXISTS", "project name already exists in this team");
+    throw new AppError(409, "DUPLICATE", "duplicate project");
+  }
+      throw e; // 나머지는 전역으로
     }
   }
 );

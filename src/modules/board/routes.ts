@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { requireAuth, requireBoardAccess, requireBoardOwnerOrAdmin, requireTeamMember } from "../../common/middleware/auth.js";
 import { createBoardSchema, listBoardsSchema, getBoardDetailSchema,updateBoardSchema,deleteBoardSchema } from "./schema.js";
-
+import { Prisma } from "@prisma/client";
 const boardRoutes: FastifyPluginAsync = async (app) => {
 
   // 팀 보드 목록 (팀 멤버만)
@@ -31,41 +31,55 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
   );
 
   // 보드 생성 + 기본 컬럼 3개 생성 (팀 멤버 누구나)
-  app.post(
-    "/teams/:teamId/boards",
-    {
-      preHandler: [requireAuth, requireTeamMember(app, (req: any) => req.params.teamId)],
-      schema: createBoardSchema,
-    },
-    async (req: any, reply) => {
-      const teamId = req.params.teamId as string;
-      const userId = req.user.sub as string;
-      const body = req.body as { name: string };
+ app.post(
+  "/teams/:teamId/boards",
+  {
+    preHandler: [requireAuth, requireTeamMember(app, (req: any) => req.params.teamId)],
+    schema: createBoardSchema,
+  },
+  async (req: any, reply) => {
+    const teamId = String(req.params.teamId ?? "").trim();
+    const userId = req.user.sub as string;
+    const body = req.body as { name: string };
 
-      const name = body.name?.trim();
-      if (!name) return reply.status(400).send({ code: "NAME_REQUIRED", message: "name required" });
+    const name = String(body.name ?? "").trim();
+    if (!teamId) return reply.status(400).send({ code: "TEAMID_REQUIRED", message: "teamId required" });
+    if (!name) return reply.status(400).send({ code: "NAME_REQUIRED", message: "name required" });
 
-      const board = await app.prisma.$transaction(async (tx: any) => {
+    try {
+      const board = await app.prisma.$transaction(async (tx) => {
         const created = await tx.board.create({
           data: { teamId, name, createdByUserId: userId },
           select: { boardId: true, teamId: true, name: true, createdByUserId: true },
         });
 
         // 기본 컬럼 3개
-       await tx.column.createMany({
-      data: [
-              { boardId: created.boardId, name: "TO DO", order: 1 },
-              { boardId: created.boardId, name: "IN PROGRESS", order: 2 },
-              { boardId: created.boardId, name: "DONE", order: 3 },
-            ],
-          });
+        await tx.column.createMany({
+          data: [
+            { boardId: created.boardId, name: "TO DO", order: 1 },
+            { boardId: created.boardId, name: "IN PROGRESS", order: 2 },
+            { boardId: created.boardId, name: "DONE", order: 3 },
+          ],
+        });
 
         return created;
       });
 
       return reply.code(201).send({ board });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const target = (e.meta as any)?.target;
+        const keys = Array.isArray(target) ? target.join(",") : String(target ?? "");
+        // @@unique([teamId, name]) 충돌
+        if (keys.includes("teamId") && keys.includes("name")) {
+          return reply.status(409).send({ code: "BOARD_NAME_EXISTS", message: "board name already exists in this team" });
+        }
+        return reply.status(409).send({ code: "DUPLICATE", message: "duplicate board" });
+      }
+      throw e;
     }
-  );
+  }
+);
 
   // 보드 상세: columns + cards (팀 멤버만)
 app.get(
@@ -197,24 +211,38 @@ app.patch(
     schema: updateBoardSchema,
   },
   async (req: any, reply) => {
-    const boardId = req.params.boardId as string;
+    const boardId = String(req.params.boardId ?? "").trim();
     const body = req.body as { name: string };
-    const name = body.name?.trim();
+
+    const name = String(body.name ?? "").trim();
+    if (!boardId) return reply.status(400).send({ code: "BOARDID_REQUIRED", message: "boardId required" });
     if (!name) return reply.status(400).send({ code: "NAME_REQUIRED", message: "name required" });
 
-    const updated = await app.prisma.board.update({
-      where: { boardId },
-      data: { name },
-      select: { boardId: true, teamId: true, name: true, createdByUserId: true, createdAt: true, updatedAt: true },
-    });
+    try {
+      const updated = await app.prisma.board.update({
+        where: { boardId },
+        data: { name },
+        select: { boardId: true, teamId: true, name: true, createdByUserId: true, createdAt: true, updatedAt: true },
+      });
 
-    return reply.send({
-      board: {
-        ...updated,
-        createdAt: updated.createdAt.toISOString(),
-        updatedAt: updated.updatedAt.toISOString(),
-      },
-    });
+      return reply.send({
+        board: {
+          ...updated,
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.updatedAt.toISOString(),
+        },
+      });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const target = (e.meta as any)?.target;
+        const keys = Array.isArray(target) ? target.join(",") : String(target ?? "");
+        if (keys.includes("teamId") && keys.includes("name")) {
+          return reply.status(409).send({ code: "BOARD_NAME_EXISTS", message: "board name already exists in this team" });
+        }
+        return reply.status(409).send({ code: "DUPLICATE", message: "duplicate board" });
+      }
+      throw e;
+    }
   }
 );
 

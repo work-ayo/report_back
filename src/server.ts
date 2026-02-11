@@ -1,6 +1,6 @@
 import "dotenv/config";
 import buildApp from "./app.js";
-import { env } from "./config/env.js";
+import { env } from "./config/env.js"
 
 const app = buildApp();
 
