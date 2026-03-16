@@ -139,15 +139,19 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
     async (req: any, reply) => {
       const userId = req.user.sub as string;
       const columnId = req.params.columnId as string;
-
+      
       const existing = await app.prisma.column.findUnique({
         where: { columnId },
         select: { columnId: true, boardId: true },
       });
+
       if (!existing) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
+      
+      //TODO name === ARCHIVE, TO DO, IN PROGRESS ,DONE return;
 
       const access = await assertBoardAccess(app, userId, existing.boardId);
       if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });
+
 
       await app.prisma.$transaction(async (tx: any) => {
         await tx.column.delete({ where: { columnId } });

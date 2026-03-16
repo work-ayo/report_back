@@ -262,3 +262,47 @@ export const deleteBoardSchema = {
      ...commonErrorResponses
   },
 };
+
+export const archiveListSchema = {
+  tags: ["board"],
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: "object",
+    required: ["boardId"],
+    properties: {
+      boardId: { type: "string" },
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              columnId: { type: "integer" },
+              name: { type: "string" },
+              boardId: { type: "integer" },
+              cards: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    cardId: { type: "integer" },
+                    title: { type: "string" },
+                    description: { type: "string", nullable: true },
+                    createdAt: { type: "string", format: "date-time" },
+                    updatedAt: { type: "string", format: "date-time" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+      ...commonErrorResponses
+  },
+};

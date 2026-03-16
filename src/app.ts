@@ -23,9 +23,7 @@ import summaryRoutes from "./modules/summary/routes.js";
 export default function buildApp() {
 const app = Fastify({
   disableRequestLogging: true,
-  logger: process.env.NODE_ENV === "production"
-    ? true
-    : {
+  logger: {
         transport: {
           target: "pino-pretty",
           options: {
@@ -108,36 +106,37 @@ const app = Fastify({
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 
   });
+  
   app.register(formbody);
-
   app.register(prismaPlugin);
   app.register(jwtPlugin);
+  app.register(
+    async (api) => {
+      api.register(swaggerPlugin);
 
-  app.register(swaggerPlugin);
-  app.register(adminRoutes);
-  app.register(adminTeamRoutes);
-  app.register(adminProjectRoutes);
+      api.register(adminRoutes);
+      api.register(adminTeamRoutes);
+      api.register(adminProjectRoutes);
 
-  app.register(summaryRoutes);
+      api.register(summaryRoutes);
 
+      api.register(authRoutes);
+      api.register(projectRoutes);
+      api.register(teamRoutes);
+      api.register(weeklyRoutes);
 
+      api.register(boardRoutes);
+      api.register(cardRoutes);
+      api.register(columnRoutes);
 
-  app.register(authRoutes);
-  app.register(projectRoutes);
-  app.register(teamRoutes);
-  app.register(weeklyRoutes);
+      api.get("/health", async () => ({ ok: true }));
 
-  app.register(boardRoutes);
-  app.register(cardRoutes);
-  app.register(columnRoutes);
-
-
-  app.get("/health", async () => ({ ok: true }));
-
-  app.get("/health/db", async () => {
-    await app.prisma.$queryRaw`SELECT 1`;
-    return { ok: true };
-  });
-
+      api.get("/health/db", async () => {
+        await api.prisma.$queryRaw`SELECT 1`;
+        return { ok: true };
+      });
+    },
+    { prefix: "/api" }
+  );
   return app;
 }

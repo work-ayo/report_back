@@ -23,7 +23,7 @@ const swaggerPlugin: FastifyPluginAsync = async (app) => {
   });
 
   await app.register(swaggerUI, {
-    routePrefix: "/docs",
+    routePrefix: "docs",
     uiConfig: {
       persistAuthorization: true,
     },

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { requireAuth, requireBoardAccess, requireBoardOwnerOrAdmin, requireTeamMember } from "../../common/middleware/auth.js";
-import { createBoardSchema, listBoardsSchema, getBoardDetailSchema,updateBoardSchema,deleteBoardSchema } from "./schema.js";
+import { createBoardSchema, listBoardsSchema, getBoardDetailSchema,updateBoardSchema,deleteBoardSchema, archiveListSchema } from "./schema.js";
 import { Prisma } from "@prisma/client";
 const boardRoutes: FastifyPluginAsync = async (app) => {
 
@@ -59,6 +59,7 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
             { boardId: created.boardId, name: "TO DO", order: 1 },
             { boardId: created.boardId, name: "IN PROGRESS", order: 2 },
             { boardId: created.boardId, name: "DONE", order: 3 },
+            { boardId: created.boardId, name: "ARCHIVE", order: 4 },
           ],
         });
 
@@ -80,6 +81,40 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
     }
   }
 );
+
+
+app.get(
+  "/boards/:boardId/archive",
+  {
+    preHandler: [requireAuth, requireBoardAccess(app)],
+    schema: archiveListSchema,
+  },
+  async (req: any, reply) => {
+    const boardId = req.params.boardId as string;
+    const archiveColumns = await app.prisma.column.findMany({
+      where: {
+        boardId,
+        name: "ARCHIVE",
+      },
+      include: {
+        cards: {
+          orderBy: {
+            cardId: "desc", // 필요 없으면 빼도 됨
+          },
+        },
+      },
+      orderBy: {
+        columnId: "asc",
+      },
+    });
+
+    return reply.send({
+      items: archiveColumns,
+    });
+  }
+);
+
+
 
   // 보드 상세: columns + cards (팀 멤버만)
 app.get(
@@ -166,8 +201,6 @@ app.get(
   }
 );
 
-
-
   //보드삭제, 
 app.delete(
   "/boards/:boardId",
@@ -244,10 +277,7 @@ app.patch(
       throw e;
     }
   }
-);
-
-
-  
+);  
 };
 
 export default boardRoutes;
