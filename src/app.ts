@@ -7,6 +7,7 @@ import prismaPlugin from "./plugins/prisma.js";
 import swaggerPlugin from "./plugins/swagger.js";
 import jwtPlugin from "./plugins/jwt.js";
 import { AppError } from "./common/errors.js";
+import cookie from "@fastify/cookie";
 
 import authRoutes from "./modules/auth/routes.js";
 import teamRoutes from "./modules/team/routes.js";
@@ -19,45 +20,48 @@ import columnRoutes from "./modules/column/routes.js";
 import adminProjectRoutes from "./modules/admin/project/routes.js";
 import projectRoutes from "./modules/project/routes.js";
 import summaryRoutes from "./modules/summary/routes.js";
+import { logger } from "./common/logger.js";
+import { env } from "./config/env.js";
+function shouldSkipAccessLog(url: string) {
+  return (
+    url.startsWith("/docs") ||
+    url.startsWith("/health") ||
+    url.startsWith("/favicon")
+  );
+}
+
 
 export default function buildApp() {
-const app = Fastify({
-  disableRequestLogging: true,
-  logger: {
-        transport: {
-          target: "pino-pretty",
-          options: {
-            colorize: true,
-           translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
-            ignore: "pid,hostname,reqId", 
-            singleLine: true,
-          },
-        },
-      },
-});
+  const app = Fastify({
+    loggerInstance: logger,
+    disableRequestLogging: true,
+  });
+  
 
 
   // 요청 로그(필요한 것만)
-  app.addHook("onResponse", async (req, reply) => {
-    const url = req.url;
+ app.addHook("onResponse", async (req, reply) => {
+    if (shouldSkipAccessLog(req.url)) return;
 
-    if (
-      url.startsWith("/docs") ||
-      url.startsWith("/health") ||
-      url.startsWith("/favicon")
-    ) {
+    const userId = (req as any).user?.sub as string | undefined;
+    const message = `${req.method} ${req.url} ${reply.statusCode} ${Math.round(
+      reply.elapsedTime
+    )}ms user=${userId ?? "-"}`;
+
+    if (reply.statusCode >= 500) {
+      req.log.error(message);
       return;
     }
 
-    const status = reply.statusCode;
-    const userId = (req as any).user?.sub as string | undefined;
+    if (reply.statusCode >= 400) {
+      req.log.warn(message);
+      return;
+    }
 
-    const msg = userId
-      ? `(${status}) ${req.method} ${url} -> (user=${userId})`
-      : `(${status}) ${req.method} ${url}`;
-
-    req.log.info(msg);
+    req.log.info(message);
   });
+
+
 
 
   //전역 에러 핸들러 (응답 + 로그 통일)
@@ -106,7 +110,9 @@ const app = Fastify({
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 
   });
-  
+   app.register(cookie, {
+    secret: env.COOKIE_SECRET,
+  })
   app.register(formbody);
   app.register(prismaPlugin);
   app.register(jwtPlugin);

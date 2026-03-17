@@ -53,7 +53,7 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
           select: { boardId: true, teamId: true, name: true, createdByUserId: true },
         });
 
-        // 기본 컬럼 3개
+        // 기본 컬럼 4개
         await tx.column.createMany({
           data: [
             { boardId: created.boardId, name: "TO DO", order: 1 },
@@ -84,27 +84,46 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
 
 
 app.get(
-  "/boards/:boardId/archive",
+  "/boards/:boardId/:columnName",
   {
     preHandler: [requireAuth, requireBoardAccess(app)],
     schema: archiveListSchema,
   },
   async (req: any, reply) => {
     const boardId = req.params.boardId as string;
+    const columnName = req.params.columnName;
+
     const archiveColumns = await app.prisma.column.findMany({
       where: {
         boardId,
-        name: "ARCHIVE",
-      },
-      include: {
-        cards: {
-          orderBy: {
-            cardId: "desc", // 필요 없으면 빼도 됨
-          },
-        },
+        name: columnName,
       },
       orderBy: {
         columnId: "asc",
+      },
+      select: {
+        columnId: true,
+        boardId: true,
+        name: true,
+        order: true,
+        createdAt: true,
+        updatedAt: true,
+        cards: {
+          orderBy: {
+            updatedAt: "desc",
+          },
+          select: {
+            cardId: true,
+            dueDate: true,
+            title: true,
+            content: true,
+            order: true,
+            createdAt: true,
+            updatedAt: true,
+            project:true,
+          createdBy: { select: { userId: true, name: true } }, 
+          },
+        },
       },
     });
 
@@ -113,8 +132,6 @@ app.get(
     });
   }
 );
-
-
 
   // 보드 상세: columns + cards (팀 멤버만)
 app.get(
@@ -130,63 +147,80 @@ app.get(
         teamId: true,
         name: true,
         createdByUserId: true,
-        createdBy:true,
+        createdBy: true,
         createdAt: true,
         updatedAt: true,
       },
     });
-    if (!board) return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
 
-    const [columns, cards] = await Promise.all([
-      app.prisma.column.findMany({
-        where: { boardId },
-        select: { columnId: true, boardId: true, name: true, order: true},
-        orderBy: { order: "asc" },
-      }),
+    if (!board) {
+      return reply.status(404).send({
+        code: "BOARD_NOT_FOUND",
+        message: "board not found",
+      });
+    }
 
-      app.prisma.card.findMany({
-        where: { boardId },
-        select: {
-          cardId: true,
-          boardId: true,
-          columnId: true,
-          dueDate:true,
-          title: true,
-          content: true,
-          order: true,
-          createdAt: true,
-          updatedAt: true,
-          project:true,
-          createdBy: { select: { userId: true, name: true } }, 
+    const columns = await app.prisma.column.findMany({
+      where: { boardId },
+      select: {
+        columnId: true,
+        boardId: true,
+        name: true,
+        order: true,
+      },
+      orderBy: { order: "asc" },
+    });
+
+    const archiveColumn = columns.find((col) => col.name === "ARCHIVE");
+
+    const cards = await app.prisma.card.findMany({
+      where: { boardId },
+      select: {
+        cardId: true,
+        boardId: true,
+        columnId: true,
+        dueDate: true,
+        title: true,
+        content: true,
+        order: true,
+        createdAt: true,
+        updatedAt: true,
+        project: true,
+        createdBy: {
+          select: { userId: true, name: true },
         },
-        orderBy: [{ columnId: "asc" }, { order: "asc" }],
-      })
+      },
+      orderBy: [{ columnId: "asc" }, { order: "asc" }],
+    });
 
-    ]);
+    const filteredCards = archiveColumn
+      ? [
+          ...cards.filter((c) => c.columnId !== archiveColumn.columnId),
+          ...cards
+            .filter((c) => c.columnId === archiveColumn.columnId)
+            .slice(0, 5),
+        ]
+      : cards;
 
-
-    // cardsById
     const cardsById: Record<string, any> = {};
-    for (const c of cards) {
+    for (const c of filteredCards) {
       cardsById[c.cardId] = {
         ...c,
-        dueDate: c.dueDate ? c.dueDate.toISOString() : null, 
+        dueDate: c.dueDate ? c.dueDate.toISOString() : null,
         createdAt: c.createdAt.toISOString(),
         updatedAt: c.updatedAt.toISOString(),
       };
     }
 
-    // cardIdsByColumnId (컬럼 순서와 무관하게 카드만 그룹)
-   const cardIdsByColumnId: Record<string, string[]> = Object.create(null);
+    const cardIdsByColumnId: Record<string, string[]> = Object.create(null);
 
     for (const col of columns) {
       cardIdsByColumnId[col.columnId] = [];
     }
 
-    for (const c of cards) {
+    for (const c of filteredCards) {
       (cardIdsByColumnId[c.columnId] ??= []).push(c.cardId);
     }
-
 
     return reply.send({
       board: {
@@ -200,7 +234,6 @@ app.get(
     });
   }
 );
-
   //보드삭제, 
 app.delete(
   "/boards/:boardId",

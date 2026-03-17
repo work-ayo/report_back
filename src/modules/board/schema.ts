@@ -276,25 +276,55 @@ export const archiveListSchema = {
   response: {
     200: {
       type: "object",
+      required: ["items"],
       properties: {
         items: {
           type: "array",
           items: {
             type: "object",
+            required: ["columnId", "boardId", "name", "order", "createdAt", "updatedAt", "cards"],
             properties: {
-              columnId: { type: "integer" },
+              columnId: { type: "string" },
+              boardId: { type: "string" },
               name: { type: "string" },
-              boardId: { type: "integer" },
+              order: { type: "integer" },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
               cards: {
                 type: "array",
                 items: {
                   type: "object",
+                  required: ["cardId", "title", "order", "createdAt", "updatedAt"],
                   properties: {
-                    cardId: { type: "integer" },
+                    cardId: { type: "string" },
+                    dueDate: { type: "string", format: "date-time" },
                     title: { type: "string" },
-                    description: { type: "string", nullable: true },
+                    content: { type: "string" },
+                    order: { type: "integer" },
                     createdAt: { type: "string", format: "date-time" },
                     updatedAt: { type: "string", format: "date-time" },
+                    project: {
+                      anyOf: [
+                        {
+                          type: "object",
+                          properties: {
+                            projectId: { type: "string" },
+                            name: { type: "string" },
+                          },
+                        },
+                      ],
+                    },
+                    createdBy: {
+                      anyOf: [
+                        {
+                          type: "object",
+                          properties: {
+                            userId: { type: "string" },
+                            name: { type: "string" },
+                          },
+                        },
+                      ],
+                    },
                   },
                 },
               },
@@ -303,6 +333,6 @@ export const archiveListSchema = {
         },
       },
     },
-      ...commonErrorResponses
+    ...commonErrorResponses,
   },
 };

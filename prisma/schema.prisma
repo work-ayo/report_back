@@ -18,6 +18,21 @@ enum TeamRole {
   MEMBER
 }
 
+model RefreshToken {
+  refreshTokenId String    @id @default(cuid())
+  userId         String
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
+  revokedAt      DateTime?
+  replacedById   String?
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 model User {
   userId     String     @id @default(cuid()) @db.VarChar(32)
   id         String     @unique @db.VarChar(50)
@@ -39,6 +54,7 @@ model User {
 
   columnsCreated  Column[]   @relation("ColumnCreator")
   projectsCreated Project[]  @relation("ProjectCreator")
+    refreshTokens RefreshToken[]
 }
 
 model Team {

@@ -1,37 +1,38 @@
-// src/modules/auth/routes.ts
 import type { FastifyPluginAsync } from "fastify";
 import argon2 from "argon2";
 import { requireAuth } from "../../common/middleware/auth.js";
+import { E } from "../../common/errors.js";
 import {
   signupSchema,
   loginSchema,
   meSchema,
-  changePasswordSchema
+  patchMeSchema,
+  refreshSchema,
+  logoutSchema,
 } from "./schema.js";
-import { E } from "../../common/errors.js";
+import { env } from "../../config/env.js";
+import { generateRefreshToken, hashToken } from "./util.js";
 
 const base = "/auth";
+const ACCESS_TOKEN_EXPIRES_IN = env.ACCESS_TOKEN_EXPIRES_IN;
 
 const authRoutes: FastifyPluginAsync = async (app) => {
-  // 회원가입
   app.post(`${base}/signup`, { schema: signupSchema }, async (req, reply) => {
-    const body = req.body as {
-      id: string; // 로그인 아이디
-      password: string; 
-      name: string;
-      department?: string;
-    };
+    const body = req.body as { id: string; password: string; name: string };
 
     const id = body.id?.trim();
-    const password = body.password ?? "";
+    const password = (body.password ?? "").trim();
     const name = body.name?.trim();
 
-    if (!id || id.length < 3) return reply.code(400).send({ error: "id too short" });
-    if (!password || password.length < 8) return reply.code(400).send({ error: "password too short" });
-    if (!name) return reply.code(400).send({ error: "name required" });
+    if (!id || id.length < 3) throw E.badRequest("ID_TOO_SHORT", "id too short");
+    if (!password || password.length < 8) throw E.badRequest("PASSWORD_TOO_SHORT", "password too short");
+    if (!name) throw E.badRequest("NAME_REQUIRED", "name required");
 
-    const exists = await app.prisma.user.findUnique({ where: { id } });
-    if (exists) return reply.code(409).send({ error: "id already exists" });
+    const exists = await app.prisma.user.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+    if (exists) throw E.conflict("DUPLICATE_ID", "id already exists");
 
     const hashed = await argon2.hash(password);
 
@@ -40,37 +41,87 @@ const authRoutes: FastifyPluginAsync = async (app) => {
         id,
         password: hashed,
         name,
-        department: body.department?.trim() || null,
+        isActive: true,
       },
-      select: { userId: true, id: true, name: true, department: true, globalRole: true },
+      select: { userId: true, id: true, name: true, isActive: true },
     });
 
-    const accessToken = app.jwt.sign({ sub: user.userId });
+    const accessToken = app.jwt.sign(
+      { sub: user.userId },
+      { expiresIn: ACCESS_TOKEN_EXPIRES_IN }
+    );
 
     return reply.code(201).send({ accessToken, user });
   });
 
-  // 로그인
-  app.post(`${base}/login`, { schema: loginSchema }, async (req, reply) => {
+  app.post(`${base}/login`, { schema: loginSchema }, async (req: any, reply) => {
     const body = req.body as { id: string; password: string };
 
     const id = body.id?.trim();
-    const password = body.password ?? "";
+    const password = (body.password ?? "").trim();
+
+    req.log.info(
+      {
+        origin: req.headers.origin ?? null,
+        host: req.headers.host ?? null,
+        referer: req.headers.referer ?? null,
+        cookieHeader: req.headers.cookie ?? null,
+      },
+      "login request info"
+    );
 
     if (!id || !password) throw E.unauthorized("1", "check id or password");
 
-    const user = await app.prisma.user.findUnique({ where: { id } });
+    const user = await app.prisma.user.findUnique({
+      where: { id },
+      select: { userId: true, id: true, name: true, isActive: true, password: true },
+    });
+
     if (!user || !user.isActive) throw E.unauthorized("1", "check id or password");
 
     const ok = await argon2.verify(user.password, password);
-    if (!ok) throw E.unauthorized("1", "check password");
+    if (!ok) throw E.unauthorized("1", "check id or password");
 
-    await app.prisma.user.update({
-      where: { userId: user.userId },
-      data: { lastLoginAt: new Date() },
+    // req.log.info({ userId: user.userId }, "login success - issuing tokens");
+
+    const accessToken = app.jwt.sign(
+      { sub: user.userId },
+      { expiresIn: ACCESS_TOKEN_EXPIRES_IN }
+    );
+
+    const refreshToken = generateRefreshToken();
+    const tokenHash = hashToken(refreshToken);
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 14);
+
+    await app.prisma.refreshToken.create({
+      data: {
+        userId: user.userId,
+        tokenHash,
+        expiresAt,
+      },
     });
 
-    const accessToken = app.jwt.sign({ sub: user.userId });
+    reply.setCookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      path: "/",
+      expires: expiresAt,
+    });
+
+    // req.log.info(
+    //   {
+    //     userId: user.userId,
+    //     cookieName: "refreshToken",
+    //     secure: false,
+    //     sameSite: "lax",
+    //     path: "/",
+    //     expiresAt,
+    //   },
+    //   "refresh cookie set on response"
+    // );
 
     return reply.send({
       accessToken,
@@ -78,110 +129,189 @@ const authRoutes: FastifyPluginAsync = async (app) => {
         userId: user.userId,
         id: user.id,
         name: user.name,
-        department: user.department,
-        globalRole: user.globalRole,
+        isActive: user.isActive,
       },
     });
   });
 
-  // 내 정보 (JWT 필요)
-  app.get(
-    `${base}/me`,
-    { preHandler: (app as any).authenticate, schema: meSchema },
-    async (req: any, reply) => {
-      const userId = req.user?.sub as string;
+  app.post(`${base}/refresh`, { schema: refreshSchema }, async (req: any, reply) => {
+    const token = req.cookies.refreshToken;
 
-      const user = await app.prisma.user.findUnique({
-        where: { userId },
-        select: {
-          userId: true,
-          id: true,
-          name: true,
-          department: true,
-          globalRole: true,
-          isActive: true,
-        },
-      });
+    // req.log.info(
+    //   {
+    //     origin: req.headers.origin ?? null,
+    //     host: req.headers.host ?? null,
+    //     referer: req.headers.referer ?? null,
+    //     cookieHeader: req.headers.cookie ?? null,
+    //     parsedCookieKeys: Object.keys(req.cookies ?? {}),
+    //     hasRefreshToken: !!token,
+    //   },
+    //   "refresh start"
+    // );
 
-      if (!user || !user.isActive) return reply.status(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
-
-
-      return reply.send({ user });
-    }
-  );
-
-
-app.patch(
-  `${base}/me`,
-  { preHandler: [requireAuth], schema: changePasswordSchema },
-  async (req: any, reply) => {
-    const userId = req.user?.sub as string;
-
-    const body = req.body as { name?: string; password?: string; newPassword?: string };
-
-    const name = body.name?.trim();
-    const password = (body.password ?? "").trim();
-    const newPassword = (body.newPassword ?? "").trim();
-
-    const wantChangeName = name !== undefined && name.length > 0;
-    const wantChangePassword = password.length > 0 || newPassword.length > 0;
-
-    // 아무 것도 안 보내면 400
-    if (!wantChangeName && !wantChangePassword) {
-      return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
+    if (!token) {
+      req.log.warn("refresh fail: NO_TOKEN");
+      throw E.unauthorized("NO_TOKEN", "no refresh token");
     }
 
-    // 비번 변경이면 둘 다 있어야 함
-    if (wantChangePassword) {
-      if (!password || !newPassword) {
-        return reply.status(400).send({ code: "MISSING_FIELDS", message: "missing password fields" });
-      }
-      if (newPassword.length < 8) {
-        return reply.status(400).send({ code: "PASSWORD_TOO_SHORT", message: "password too short" });
-      }
-      if (password === newPassword) {
-        return reply.status(400).send({ code: "SAME_PASSWORD", message: "new password must be different" });
-      }
+    const tokenHash = hashToken(token);
+
+    const stored = await app.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!stored) {
+      req.log.warn("refresh fail: INVALID_TOKEN");
+      throw E.unauthorized("INVALID_TOKEN", "invalid token");
+    }
+
+    if (stored.revokedAt) {
+      req.log.warn({ revokedAt: stored.revokedAt }, "refresh fail: TOKEN_REVOKED");
+      throw E.unauthorized("TOKEN_REVOKED", "token revoked");
+    }
+
+    if (stored.expiresAt < new Date()) {
+      req.log.warn({ expiresAt: stored.expiresAt }, "refresh fail: TOKEN_EXPIRED");
+      throw E.unauthorized("TOKEN_EXPIRED", "token expired");
     }
 
     const user = await app.prisma.user.findUnique({
-      where: { userId },
-      select: { userId: true, password: true, isActive: true },
+      where: { userId: stored.userId },
+      select: { userId: true, isActive: true },
     });
 
     if (!user || !user.isActive) {
-      return reply.status(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
+      req.log.warn({ userId: stored.userId }, "refresh fail: USER_NOT_FOUND");
+      throw E.unauthorized("USER_NOT_FOUND", "user not found");
     }
 
-    const data: any = {};
+    const accessToken = app.jwt.sign(
+      { sub: user.userId },
+      { expiresIn: "30s" }
+    );
 
-    // 이름 변경
-    if (wantChangeName) {
-      if (name.length > 50) {
-        return reply.status(400).send({ code: "NAME_TOO_LONG", message: "name too long" });
-      }
-      data.name = name;
+    req.log.info({ userId: user.userId }, "refresh success");
+
+    return reply.send({ accessToken });
+  });
+
+  app.post(`${base}/logout`, { schema: logoutSchema }, async (req: any, reply) => {
+    const token = req.cookies.refreshToken;
+
+    if (token) {
+      const tokenHash = hashToken(token);
+
+      await app.prisma.refreshToken.updateMany({
+        where: { tokenHash },
+        data: { revokedAt: new Date() },
+      });
     }
 
-    // 비번 변경
-    if (wantChangePassword) {
-      const ok = await argon2.verify(user.password, password);
-      if (!ok) {
-        return reply.status(401).send({ code: "INVALID_PASSWORD", message: "invalid password" });
-      }
-      data.password = await argon2.hash(newPassword);
-    }
-
-    await app.prisma.user.update({
-      where: { userId },
-      data,
-    });
+    reply.clearCookie("refreshToken", { path: "/" });
 
     return reply.send({ ok: true });
+  });
+
+app.get(`${base}/me`, { preHandler: [requireAuth], schema: meSchema }, async (req: any, reply) => {
+  const userId = req.user?.sub as string;
+  if (!userId) throw E.unauthorized("UNAUTHORIZED", "unauthorized");
+
+  const user = await app.prisma.user.findUnique({
+    where: { userId },
+    select: {
+      userId: true,
+      id: true,
+      name: true,
+      isActive: true,
+      createdAt: true,
+    },
+  });
+  if (!user || !user.isActive) throw E.unauthorized("UNAUTHORIZED", "unauthorized");
+
+  return reply.send({ user });
+});
+
+
+app.patch(`${base}/me`, { preHandler: [requireAuth], schema: patchMeSchema }, async (req: any, reply) => {
+  const userId = req.user?.sub as string;
+  if (!userId) throw E.unauthorized("UNAUTHORIZED", "unauthorized");
+
+  const body = req.body as {
+    name?: string;
+    password?: string;
+    newPassword?: string;
+    primaryCardId?: number | null;
+  };
+
+  const name = body.name?.trim();
+  const password = (body.password ?? "").trim();
+  const newPassword = (body.newPassword ?? "").trim();
+
+  const wantChangeName = name !== undefined && name.length > 0;
+  const wantChangePassword = password.length > 0 && newPassword.length > 0;
+
+  if (!wantChangeName && !wantChangePassword) {
+    throw E.badRequest("NO_FIELDS", "no fields to update");
   }
-);
+
+  if ((password.length > 0 || newPassword.length > 0) && !wantChangePassword) {
+    throw E.badRequest("MISSING_FIELDS", "missing password fields");
+  }
+
+  if (wantChangeName && name!.length > 100) {
+    throw E.badRequest("NAME_TOO_LONG", "name too long");
+  }
+
+  if (wantChangePassword) {
+    if (newPassword.length < 8) {
+      throw E.badRequest("PASSWORD_TOO_SHORT", "password too short");
+    }
+    if (password === newPassword) {
+      throw E.badRequest("SAME_PASSWORD", "new password must be different");
+    }
+  }
+
+  const user = await app.prisma.user.findUnique({
+    where: { userId },
+    select: {
+      userId: true,
+      name: true,
+      password: true,
+      isActive: true,
+    },
+  });
+
+  if (!user || !user.isActive) {
+    throw E.unauthorized("UNAUTHORIZED", "unauthorized");
+  }
+
+  const data: Record<string, any> = {};
+
+  if (wantChangeName && name !== user.name) {
+    data.name = name;
+  }
+
+  if (wantChangePassword) {
+    const ok = await argon2.verify(user.password, password);
+    if (!ok) {
+      throw E.badRequest("INVALID_PASSWORD", "현재 비밀번호가 올바르지 않습니다.");
+    }
+    data.password = await argon2.hash(newPassword);
+  }
 
 
+
+  if (Object.keys(data).length === 0) {
+    throw E.badRequest("NO_FIELDS", "no fields to update");
+  }
+
+  await app.prisma.user.update({
+    where: { userId },
+    data,
+  });
+
+  return reply.send({ ok: true });
+});
 };
 
 export default authRoutes;
