@@ -24,6 +24,7 @@ const projectMiniShape = {
     price: { type: "string", pattern: "^[0-9]+$" },
     startDate: { type: "string" },
     endDate: { type: "string" },
+    colorCode:{type:"string"}
   },
 };
 
@@ -41,6 +42,7 @@ export const createCardSchema = {
       content: { type: "string", default: "" },
       projectId: { type: "string", default: "" },
       dueDate: { type: "string", default: "" },
+      md:{type:"integer"}
     },
   },
   response: {
@@ -85,6 +87,7 @@ export const createCardSchema = {
 
             createdAt: { type: "string" },
             updatedAt: { type: "string" },
+             md:{type:"integer"}
           },
         },
       },
@@ -115,6 +118,7 @@ export const updateCardSchema = {
       title: { type: "string", minLength: 1, maxLength: 120, default: "" },
       content: { type: "string", default: "" },
       dueDate: { type: "string", default: "", description: "YYYY-MM-DD" },
+       md:{type:"integer"},
       projectId: { type: "string", default: "" }, // ""이면 null로 처리하는 로직이면 OK
     },
   },
@@ -157,6 +161,7 @@ export const updateCardSchema = {
             createdByUserId: { type: "string" },
             createdAt: { type: "string" },
             updatedAt: { type: "string" },
+             md:{type:"integer"}
           },
         },
       },

@@ -53,13 +53,14 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
           select: { boardId: true, teamId: true, name: true, createdByUserId: true },
         });
 
-        // 기본 컬럼 4개
+        // 기본 컬럼 5개
         await tx.column.createMany({
           data: [
             { boardId: created.boardId, name: "TO DO", order: 1 },
             { boardId: created.boardId, name: "IN PROGRESS", order: 2 },
             { boardId: created.boardId, name: "DONE", order: 3 },
-            { boardId: created.boardId, name: "ARCHIVE", order: 4 },
+            { boardId: created.boardId, name: "HOLD", order: 4 },
+             { boardId: created.boardId, name: "COMPLETED", order: 5 },
           ],
         });
 
@@ -108,6 +109,7 @@ app.get(
         order: true,
         createdAt: true,
         updatedAt: true,
+        
         cards: {
           orderBy: {
             updatedAt: "desc",
@@ -186,6 +188,7 @@ app.get(
         createdAt: true,
         updatedAt: true,
         project: true,
+        md:true,
         createdBy: {
           select: { userId: true, name: true },
         },
@@ -234,6 +237,8 @@ app.get(
     });
   }
 );
+
+
   //보드삭제, 
 app.delete(
   "/boards/:boardId",
@@ -248,6 +253,7 @@ app.delete(
     });
     if (!board) return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
 
+
     //admin 여부 확인
     const me = await app.prisma.user.findUnique({
       where: { userId },
@@ -255,6 +261,7 @@ app.delete(
     });
     if (!me || !me.isActive) return reply.status(401).send({ code: "UNAUTHORIZED", message: "unauthorized" });
 
+    
     const isAdmin = me.globalRole === "ADMIN";
     const isCreator = board.createdByUserId === userId;
 
@@ -262,6 +269,8 @@ app.delete(
     if (!isAdmin && !isCreator) {
       return reply.status(403).send({ code: "FORBIDDEN", message: "forbidden" });
     }
+
+
 
     await app.prisma.board.delete({ where: { boardId } });
 

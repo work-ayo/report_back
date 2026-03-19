@@ -161,6 +161,8 @@ model Project {
   code   String @db.VarChar(50)
   name   String @db.VarChar(200)
 
+ colorCode String @default("#000000") @db.VarChar(7)
+
   // 원 단위(정수)
   price BigInt @default(0)
 
@@ -196,6 +198,8 @@ model Card {
   dueDate DateTime?
 
   order Int
+  md       Int @default(0)
+
 
   createdByUserId String @db.VarChar(32)
   createdBy       User   @relation("CardCreator", fields: [createdByUserId], references: [userId], onDelete: Cascade)

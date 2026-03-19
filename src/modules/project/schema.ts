@@ -1,3 +1,4 @@
+import { minLength } from "zod";
 import { commonErrorResponses } from "../../common/commonResponse.js";
 
 // 공통: price는 BigInt라 API에서는 string(digits)로 전달
@@ -10,7 +11,7 @@ const projectShape = {
     teamId: { type: "string" },
     code: { type: "string" },
     name: { type: "string" },
-
+    colorCode:{type:"string"},
     // BigInt 직렬화 대응
     price: { type: "string", pattern: "^[0-9]+$" },
     createdByUserId: { type: ["string", "null"] },
@@ -75,7 +76,7 @@ export const createProjectSchema = {
     properties: {
       code: { type: "string", minLength: 1, maxLength: 40 },
       name: { type: "string", minLength: 1, maxLength: 80 },
-
+      colorCode:{type:"string", minLength:4},
       // BigInt -> string digits
       price: { type: "string", pattern: "^[0-9]+$", default: "0" },
   
@@ -145,6 +146,7 @@ export const updateProjectSchema = {
     properties: {
       code: { type: "string", maxLength: 40 },
       name: { type: "string", maxLength: 80 },
+      colorCode:{type:"string" , minLength:4},
 
       // BigInt -> string digits
       price: { type: "string", pattern: "^[0-9]+$" },

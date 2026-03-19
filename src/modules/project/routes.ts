@@ -62,6 +62,7 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
           code: true,
           name: true,
           price: true,
+          colorCode:true,
           createdByUserId: true,
           createdBy: { select: { userId: true, name: true, id: true } },
           startDate: true,
@@ -102,11 +103,13 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
         price?: string;      // digits string
         startDate?: string;
         endDate?: string;
+        colorCode?:string;
       };
 
       const code = String(body.code ?? "").trim();
       const name = String(body.name ?? "").trim();
       const userId = req.user.sub as string;
+      const colorCode = String(body.colorCode ?? "").trim();
 
       if (!code) return reply.status(400).send({ code: "CODE_REQUIRED", message: "code required" });
       if (!name) return reply.status(400).send({ code: "NAME_REQUIRED", message: "name required" });
@@ -124,7 +127,7 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
 
       try {
         const project = await app.prisma.project.create({
-          data: { teamId, code, name, price, startDate, endDate, createdByUserId: userId },
+          data: { teamId, code, name, price, startDate, endDate,colorCode, createdByUserId: userId },
           select: {
             projectId: true,
             teamId: true,
@@ -133,6 +136,7 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
             price: true,
             startDate: true,
             endDate: true,
+            colorCode:true,
             createdAt: true,
             updatedAt: true,
             createdByUserId: true,
@@ -179,6 +183,7 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
           teamId: true,
           code: true,
           name: true,
+          colorCode:true,
           price: true,
           startDate: true,
           endDate: true,
@@ -223,6 +228,7 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
       price?: string;
       startDate?: string;
       endDate?: string;
+      colorCode?:string;
     };
 
     const data: any = {};
@@ -250,6 +256,9 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
     if (Object.keys(data).length === 0) {
       return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
     }
+    if(body.colorCode !== undefined){
+      data.colorCode = body.colorCode;
+    }
 
     const project = await app.prisma.project.update({
       where: { projectId },
@@ -264,6 +273,7 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
         endDate: true,
         createdAt: true,
         updatedAt: true,
+        colorCode:true,
         createdByUserId: true,
         createdBy: { select: { userId: true, name: true, id: true } },
       },

@@ -83,11 +83,14 @@ const adminTeamsRoutes: FastifyPluginAsync = async (app) => {
 
         //  기본 컬럼까지 같이 만들면 UX가 훨씬 좋아짐
         await tx.column.createMany({
-          data: [
+              data: [
             { boardId: board.boardId, name: "TO DO", order: 1 },
-            { boardId: board.boardId, name: "In Progress", order: 2 },
+            { boardId: board.boardId, name: "IN PROGRESS", order: 2 },
             { boardId: board.boardId, name: "DONE", order: 3 },
+            { boardId: board.boardId, name: "HOLD", order: 4 },
+             { boardId: board.boardId, name: "COMPLETED", order: 5 },
           ],
+
         });
 
         return { team, board };

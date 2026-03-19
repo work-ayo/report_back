@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Card" ADD COLUMN     "md" INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "Project" ADD COLUMN     "colorCode" VARCHAR(7) NOT NULL DEFAULT '#000000';

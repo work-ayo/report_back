@@ -14,6 +14,7 @@ const projectShape = {
     endDate:{type:"string"},
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
+    colorCode:{type:"string"}
   },
 };
 
@@ -55,7 +56,7 @@ export const adminCreateProjectSchema = {
       teamId: { type: "string", default: "" },
       code: { type: "string", minLength: 1, maxLength: 40, default: "" },
       name: { type: "string", minLength: 1, maxLength: 80, default: "" },
-
+     colorCode:{type:"string", minLength:4},
       price: { type: "string", pattern: "^[0-9]+$", default: "0" },
 
       startDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },

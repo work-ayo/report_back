@@ -44,13 +44,18 @@ app.post(
       content?: string;
       projectId?: string;
       dueDate?: string; // ISO string or ""
+      md?:number;
     };
 
     const columnId = String(body.columnId ?? "").trim();
     const title = String(body.title ?? "").trim();
     const content = String(body.content ?? "").trim();
     const projectId = String(body.projectId ?? "").trim() || null;
+    const md = body.md || 0;
 
+    if(md < 0 ){
+         return reply.status(400).send({ code: "INVALID_MD", message: "invalid md period" });
+    }
     const dueDate = parseIsoDateOrNull(body.dueDate);
     if (body.dueDate && !dueDate) {
       return reply.status(400).send({ code: "INVALID_DUEDATE", message: "invalid dueDate" });
@@ -99,6 +104,7 @@ app.post(
         dueDate,
         order: nextOrder,
         createdByUserId: userId,
+        md,
       },
       select: {
         cardId: true,
@@ -111,7 +117,7 @@ app.post(
         dueDate: true,
         createdAt: true,
         updatedAt: true,
-
+        md:true,
         //  스키마 required 때문에 반드시 포함
         createdByUserId: true,
         createdBy: { select: { userId: true, id: true, name: true } },
@@ -126,6 +132,7 @@ app.post(
             price: true,
             startDate: true,
             endDate: true,
+            colorCode:true,
           },
         },
       },
@@ -254,6 +261,7 @@ app.patch(
               projectId: true,
               name: true,
               price: true, // BigInt
+              colorCode:true,
             },
           },
         },
@@ -377,10 +385,10 @@ app.patch(
           });
         }
 
-        // ✅ to 컬럼 order를 2-phase로 재부여(충돌 방지)
+        // to 컬럼 order를 2-phase로 재부여(충돌 방지)
         await reassignOrdersSafe(tx, toColumnId, nextTo);
 
-        // ✅ from 컬럼도 2-phase로 재부여(다른 컬럼 이동일 때만)
+        //from 컬럼도 2-phase로 재부여(다른 컬럼 이동일 때만)
         if (!isSameColumn) {
           const nextFrom = fromIds.filter((id: string) => id !== cardId);
           await reassignOrdersSafe(tx, fromColumnId, nextFrom);

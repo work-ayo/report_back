@@ -35,6 +35,7 @@ const adminProjectRoutes: FastifyPluginAsync = async (app) => {
         endDate: true,
         createdAt: true,
         updatedAt: true,
+        colorCode:true,
         team: { select: { name: true } },
       },
       orderBy: [{ teamId: "asc" }, { createdAt: "desc" }],
@@ -43,6 +44,7 @@ const adminProjectRoutes: FastifyPluginAsync = async (app) => {
 
       return reply.send({
         projects: projects.map((p: any) => ({
+          colorCode:p.colorCode,
           projectId: p.projectId,
           teamId: p.teamId,
           teamName: p.team.name,
@@ -71,11 +73,13 @@ app.post(
       price?: any;
       startDate?: string;
       endDate?: string;
+         colorCode?:string;
     };
 
     const teamId = String(body.teamId ?? "").trim();
     const code = String(body.code ?? "").trim();
     const name = String(body.name ?? "").trim();
+    const colorCode = String(body.colorCode??"").trim();
 
     if (!teamId) return reply.status(400).send({ code: "TEAMID_REQUIRED", message: "teamId required" });
     if (!code) return reply.status(400).send({ code: "CODE_REQUIRED", message: "code required" });
@@ -111,13 +115,14 @@ app.post(
 
     try {
       const project = await app.prisma.project.create({
-        data: { teamId, code, name, price, startDate, endDate },
+        data: { teamId, code, name, price, startDate, endDate,colorCode },
         select: {
           projectId: true,
           teamId: true,
           code: true,
           name: true,
           price: true,
+          colorCode:true,
           startDate: true,
           endDate: true,
           createdAt: true,
@@ -127,6 +132,7 @@ app.post(
 
       return reply.code(201).send({
         project: {
+          colorCode:project.colorCode,
           projectId: project.projectId,
           teamId: project.teamId,
           teamName: team.name,
@@ -157,7 +163,7 @@ app.patch(
   { preHandler: adminPre, schema: adminUpdateProjectSchema },
   async (req: any, reply) => {
     const projectId = req.params.projectId as string;
-    const body = req.body as { teamId?: string; code?: string; name?: string; price?: any; startDate?: string; endDate?: string };
+    const body = req.body as { teamId?: string; code?: string; name?: string; price?: any; startDate?: string; endDate?: string; colorCode?:string };
 
 
     const exists = await app.prisma.project.findUnique({
@@ -226,11 +232,13 @@ app.patch(
           endDate: true,
           createdAt: true,
           updatedAt: true,
+          colorCode:true,
         },
       });
 
       return reply.send({
         project: {
+          colorCode:project.colorCode,
           projectId: project.projectId,
           teamId: project.teamId,
           teamName: team.name,

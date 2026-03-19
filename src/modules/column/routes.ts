@@ -54,7 +54,7 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
       try {
         const column = await app.prisma.column.create({
           data: { boardId, name, order: nextOrder, createdByUserId: userId },
-          select: { columnId: true, boardId: true, name: true, order: true },
+          select: { columnId: true, boardId: true, name: true, order: true,updatedAt:true },
         });
 
         return reply.code(201).send({ column });
@@ -142,15 +142,18 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
       
       const existing = await app.prisma.column.findUnique({
         where: { columnId },
-        select: { columnId: true, boardId: true },
+        select: { columnId: true, boardId: true,name:true },
       });
 
       if (!existing) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
       
-      //TODO name === ARCHIVE, TO DO, IN PROGRESS ,DONE return;
 
       const access = await assertBoardAccess(app, userId, existing.boardId);
       if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });
+
+          if(existing.name === "IN PROGRESS" || existing.name === "TO DO" || existing.name === "HOLD" ||  existing.name === "DONE" || existing.name === "COMPLETED"){
+      return reply.status(400).send({code:"CAN_NOT_DELETE_COLUMN", message:"can not delete this column"});
+    }
 
 
       await app.prisma.$transaction(async (tx: any) => {
@@ -197,9 +200,14 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
 
       const existing = await app.prisma.column.findUnique({
         where: { columnId },
-        select: { columnId: true, boardId: true },
+        select: { columnId: true, boardId: true,name:true },
       });
       if (!existing) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
+
+    //   if(existing.name === "IN PROGRESS" || existing.name === "TO DO" || existing.name === "HOLD" || existing.name === "ARCHIVE"){
+    //   return reply.status(400).send({code:"CAN_NOT_CHANGE_COLUMN", message:"can not change this column"});
+    // }
+
 
       const access = await assertBoardAccess(app, userId, existing.boardId);
       if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });

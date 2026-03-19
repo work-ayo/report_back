@@ -22,6 +22,7 @@ const projectShape = {
     code: { type: "string" },
     name: { type: "string" },
     price: { type: "integer", minimum: 0 },
+    colorCode:{type:"string"},
     // createdAt: { type: "string" },
     // updatedAt: { type: "string" },
   },
@@ -74,6 +75,7 @@ const cardShape = {
     updatedAt: { type: "string" },
     createdBy: createdByShape,
    dueDate: { type: ["string", "null"],},
+      md:{type:"integer"},
     // project는 nullable (card.projectId가 null일 수 있으니까)
     project: projectShape,
   },
