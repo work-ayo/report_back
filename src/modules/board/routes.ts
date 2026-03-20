@@ -193,7 +193,7 @@ app.get(
           select: { userId: true, name: true },
         },
       },
-      orderBy: [{ columnId: "asc" }, { order: "asc" }],
+      orderBy: [{ order: "asc" }],
     });
 
     const filteredCards = archiveColumn

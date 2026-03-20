@@ -10,29 +10,33 @@ if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
 
-const date = moment().format("YYYY-MM-DD");
 const isProd = env.NODE_ENV === "production";
 
-const appLogPath = path.join(logDir, `${date}-app.log`);
-const errorLogPath = path.join(logDir, `${date}-error.log`);
-
-const appStream = pino.destination({
-  dest: appLogPath,
-  mkdir: true,
-  sync: false,
-});
-
-const errorStream = pino.destination({
-  dest: errorLogPath,
-  mkdir: true,
-  sync: false,
-});
-
 const stream = isProd
-  ? pino.multistream([
-      { level: "info", stream: appStream },
-      { level: "error", stream: errorStream },
-    ])
+  ? pino.transport({
+      targets: [
+        {
+          target: "pino-roll",
+          level: "info",
+          options: {
+            file: path.join(logDir, "app.log"),
+            frequency: "daily",
+            dateFormat: "yyyy-MM-dd",
+            mkdir: true,
+          },
+        },
+        {
+          target: "pino-roll",
+          level: "error",
+          options: {
+            file: path.join(logDir, "error.log"),
+            frequency: "daily",
+            dateFormat: "yyyy-MM-dd",
+            mkdir: true,
+          },
+        },
+      ],
+    })
   : pino.transport({
       target: "pino-pretty",
       options: {
@@ -42,6 +46,14 @@ const stream = isProd
         ignore: "pid,hostname,service,env",
       },
     });
+
+stream.on("ready", () => {
+  console.log("[logger] transport ready");
+});
+
+stream.on("error", (err) => {
+  console.error("[logger] transport error", err);
+});
 
 export const logger = pino(
   {
@@ -60,34 +72,31 @@ export const logger = pino(
       bindings() {
         return {};
       },
-      level(label) {
-        return { level: label.toUpperCase() };
-      },
     },
   },
   stream
 );
 
 export function registerProcessErrorLogging() {
-  process.on("uncaughtException", (err) => {
+  process.on("uncaughtException", async (err) => {
     logger.error({ err }, "uncaughtException");
+    await logger.flush();
   });
 
-  process.on("unhandledRejection", (reason) => {
+  process.on("unhandledRejection", async (reason) => {
     logger.error({ err: reason }, "unhandledRejection");
+    await logger.flush();
   });
 
-  process.on("SIGINT", () => {
+  process.on("SIGINT", async () => {
     logger.info("SIGINT received");
-    appStream.flush?.();
-    errorStream.flush?.();
+    await logger.flush();
     process.exit(0);
   });
 
-  process.on("SIGTERM", () => {
+  process.on("SIGTERM", async () => {
     logger.info("SIGTERM received");
-    appStream.flush?.();
-    errorStream.flush?.();
+    await logger.flush();
     process.exit(0);
   });
 }

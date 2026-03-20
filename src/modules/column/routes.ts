@@ -1,6 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
 import { requireAuth } from "../../common/middleware/auth.js";
-import { createColumnSchema, updateColumnSchema, deleteColumnSchema, moveColumnSchema } from "./schema.js";
+import {
+  createColumnSchema,
+  updateColumnSchema,
+  deleteColumnSchema,
+  moveColumnSchema,
+} from "./schema.js";
 import { Prisma } from "@prisma/client";
 
 async function assertBoardAccess(app: any, userId: string, boardId: string) {
@@ -8,41 +13,56 @@ async function assertBoardAccess(app: any, userId: string, boardId: string) {
     where: { userId },
     select: { globalRole: true, isActive: true },
   });
-  if (!me || !me.isActive) return { ok: false as const, status: 401, code: "UNAUTHORIZED", message: "unauthorized" };
+  if (!me || !me.isActive) {
+    return { ok: false as const, status: 401, code: "UNAUTHORIZED", message: "unauthorized" };
+  }
   if (me.globalRole === "ADMIN") return { ok: true as const };
 
   const board = await app.prisma.board.findUnique({
     where: { boardId },
     select: { teamId: true },
   });
-  if (!board) return { ok: false as const, status: 404, code: "BOARD_NOT_FOUND", message: "board not found" };
+  if (!board) {
+    return { ok: false as const, status: 404, code: "BOARD_NOT_FOUND", message: "board not found" };
+  }
 
   const member = await app.prisma.teamMember.findUnique({
     where: { teamId_userId: { teamId: board.teamId, userId } },
     select: { id: true },
   });
-  if (!member) return { ok: false as const, status: 403, code: "FORBIDDEN", message: "forbidden" };
+  if (!member) {
+    return { ok: false as const, status: 403, code: "FORBIDDEN", message: "forbidden" };
+  }
 
   return { ok: true as const };
 }
 
 const columnRoutes: FastifyPluginAsync = async (app) => {
-  // 컬럼 생성
   app.post(
     "/columns",
     { preHandler: [requireAuth], schema: createColumnSchema },
     async (req: any, reply) => {
       const userId = req.user.sub as string;
+      const requestId = req.headers["x-request-id"]
+        ? String(req.headers["x-request-id"])
+        : null;
+
       const body = req.body as { boardId: string; name: string };
 
       const boardId = String(body.boardId ?? "").trim();
       const name = String(body.name ?? "").trim();
 
-      if (!boardId) return reply.status(400).send({ code: "BOARDID_REQUIRED", message: "boardId required" });
-      if (!name) return reply.status(400).send({ code: "NAME_REQUIRED", message: "name required" });
+      if (!boardId) {
+        return reply.status(400).send({ code: "BOARDID_REQUIRED", message: "boardId required" });
+      }
+      if (!name) {
+        return reply.status(400).send({ code: "NAME_REQUIRED", message: "name required" });
+      }
 
       const access = await assertBoardAccess(app, userId, boardId);
-      if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });
+      if (!access.ok) {
+        return reply.status(access.status).send({ code: access.code, message: access.message });
+      }
 
       const last = await app.prisma.column.findFirst({
         where: { boardId },
@@ -54,7 +74,22 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
       try {
         const column = await app.prisma.column.create({
           data: { boardId, name, order: nextOrder, createdByUserId: userId },
-          select: { columnId: true, boardId: true, name: true, order: true,updatedAt:true },
+          select: {
+            columnId: true,
+            boardId: true,
+            name: true,
+            order: true,
+            updatedAt: true,
+          },
+        });
+
+        app.io.to(`board:${column.boardId}`).emit("board:event", {
+          type: "column:created",
+          boardId: column.boardId,
+          column,
+          actorUserId: userId,
+          requestId,
+          updatedAt: new Date().toISOString(),
         });
 
         return reply.code(201).send({ column });
@@ -76,31 +111,42 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 
-  // 컬럼 수정
   app.patch(
     "/columns/:columnId",
     { preHandler: [requireAuth], schema: updateColumnSchema },
     async (req: any, reply) => {
       const userId = req.user.sub as string;
+      const requestId = req.headers["x-request-id"]
+        ? String(req.headers["x-request-id"])
+        : null;
+
       const columnId = String(req.params.columnId ?? "").trim();
       const body = req.body as { name?: string };
 
-      if (!columnId) return reply.status(400).send({ code: "COLUMNID_REQUIRED", message: "columnId required" });
+      if (!columnId) {
+        return reply.status(400).send({ code: "COLUMNID_REQUIRED", message: "columnId required" });
+      }
 
       const existing = await app.prisma.column.findUnique({
         where: { columnId },
         select: { columnId: true, boardId: true },
       });
-      if (!existing) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
+      if (!existing) {
+        return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
+      }
 
       const access = await assertBoardAccess(app, userId, existing.boardId);
-      if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });
+      if (!access.ok) {
+        return reply.status(access.status).send({ code: access.code, message: access.message });
+      }
 
       const data: any = {};
 
       if (body.name !== undefined) {
         const nextName = String(body.name ?? "").trim();
-        if (!nextName) return reply.status(400).send({ code: "NAME_REQUIRED", message: "name required" });
+        if (!nextName) {
+          return reply.status(400).send({ code: "NAME_REQUIRED", message: "name required" });
+        }
         data.name = nextName;
       }
 
@@ -112,7 +158,16 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
         const column = await app.prisma.column.update({
           where: { columnId },
           data,
-          select: { columnId: true, boardId: true, name: true, order: true },
+          select: { columnId: true, boardId: true, name: true, order: true, updatedAt: true },
+        });
+
+        app.io.to(`board:${column.boardId}`).emit("board:event", {
+          type: "column:updated",
+          boardId: column.boardId,
+          column,
+          actorUserId: userId,
+          requestId,
+          updatedAt: new Date().toISOString(),
         });
 
         return reply.send({ column });
@@ -131,30 +186,40 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 
-
-  // 컬럼 삭제 + order 재정렬
   app.delete(
     "/columns/:columnId",
     { preHandler: [requireAuth], schema: deleteColumnSchema },
     async (req: any, reply) => {
       const userId = req.user.sub as string;
+      const requestId = req.headers["x-request-id"]
+        ? String(req.headers["x-request-id"])
+        : null;
+
       const columnId = req.params.columnId as string;
-      
+
       const existing = await app.prisma.column.findUnique({
         where: { columnId },
-        select: { columnId: true, boardId: true,name:true },
+        select: { columnId: true, boardId: true, name: true },
       });
 
-      if (!existing) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
-      
+      if (!existing) {
+        return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
+      }
 
       const access = await assertBoardAccess(app, userId, existing.boardId);
-      if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });
+      if (!access.ok) {
+        return reply.status(access.status).send({ code: access.code, message: access.message });
+      }
 
-          if(existing.name === "IN PROGRESS" || existing.name === "TO DO" || existing.name === "HOLD" ||  existing.name === "DONE" || existing.name === "COMPLETED"){
-      return reply.status(400).send({code:"CAN_NOT_DELETE_COLUMN", message:"can not delete this column"});
-    }
-
+      if (
+        existing.name === "IN PROGRESS" ||
+        existing.name === "TO DO" ||
+        existing.name === "HOLD" ||
+        existing.name === "DONE" ||
+        existing.name === "COMPLETED"
+      ) {
+        return reply.status(400).send({ code: "CAN_NOT_DELETE_COLUMN", message: "can not delete this column" });
+      }
 
       await app.prisma.$transaction(async (tx: any) => {
         await tx.column.delete({ where: { columnId } });
@@ -167,7 +232,6 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
 
         const ids = cols.map((c: any) => c.columnId);
 
-        // 임시 order로 먼저 이동 (중복 방지)
         for (let i = 0; i < ids.length; i++) {
           await tx.column.update({
             where: { columnId: ids[i] },
@@ -175,7 +239,6 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
           });
         }
 
-        // 최종 order 재부여 (0..n-1)
         for (let i = 0; i < ids.length; i++) {
           await tx.column.update({
             where: { columnId: ids[i] },
@@ -184,37 +247,47 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
         }
       });
 
+      app.io.to(`board:${existing.boardId}`).emit("board:event", {
+        type: "column:deleted",
+        boardId: existing.boardId,
+        columnId,
+        actorUserId: userId,
+        requestId,
+        updatedAt: new Date().toISOString(),
+      });
+
       return reply.send({ ok: true });
     }
   );
 
-
-  // 컬럼 이동 (order 재정렬)
   app.patch(
     "/columns/:columnId/move",
     { preHandler: [requireAuth], schema: moveColumnSchema },
     async (req: any, reply) => {
       const userId = req.user.sub as string;
+      const requestId = req.headers["x-request-id"]
+        ? String(req.headers["x-request-id"])
+        : null;
+
       const columnId = req.params.columnId as string;
       const body = req.body as { toIndex: number };
 
       const existing = await app.prisma.column.findUnique({
         where: { columnId },
-        select: { columnId: true, boardId: true,name:true },
+        select: { columnId: true, boardId: true, name: true },
       });
-      if (!existing) return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
-
-    //   if(existing.name === "IN PROGRESS" || existing.name === "TO DO" || existing.name === "HOLD" || existing.name === "ARCHIVE"){
-    //   return reply.status(400).send({code:"CAN_NOT_CHANGE_COLUMN", message:"can not change this column"});
-    // }
-
+      if (!existing) {
+        return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
+      }
 
       const access = await assertBoardAccess(app, userId, existing.boardId);
-      if (!access.ok) return reply.status(access.status).send({ code: access.code, message: access.message });
+      if (!access.ok) {
+        return reply.status(access.status).send({ code: access.code, message: access.message });
+      }
 
       const toIndex = Math.max(0, Number(body.toIndex));
 
-      await app.prisma.$transaction(async (tx: any) => {
+      const result = await app.prisma.$transaction(async (tx: any) => {
         const cols = await tx.column.findMany({
           where: { boardId: existing.boardId },
           select: { columnId: true },
@@ -225,8 +298,6 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
         const idx = Math.max(0, Math.min(toIndex, ids.length));
         ids.splice(idx, 0, columnId);
 
-        // 임시 order로 먼저 이동 (unique 충돌 방지)
-        // 기존 order가 0..n 범위라고 가정하면 음수로 밀어두는 게 안전
         for (let i = 0; i < ids.length; i++) {
           await tx.column.update({
             where: { columnId: ids[i] },
@@ -234,19 +305,33 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
           });
         }
 
-        //최종 order 세팅
         for (let i = 0; i < ids.length; i++) {
           await tx.column.update({
             where: { columnId: ids[i] },
             data: { order: i },
           });
         }
+
+        return {
+          boardId: existing.boardId,
+          columnId,
+          toIndex: idx,
+        };
+      });
+
+      app.io.to(`board:${result.boardId}`).emit("board:event", {
+        type: "column:moved",
+        boardId: result.boardId,
+        columnId: result.columnId,
+        toIndex: result.toIndex,
+        actorUserId: userId,
+        requestId,
+        updatedAt: new Date().toISOString(),
       });
 
       return reply.send({ ok: true });
     }
   );
-
 };
 
 export default columnRoutes;

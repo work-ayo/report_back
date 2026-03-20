@@ -312,6 +312,7 @@ export const archiveListSchema = {
                           properties: {
                             projectId: { type: "string" },
                             name: { type: "string" },
+                            colorCode: { type: "string" },
                           },
                         },
                       ],

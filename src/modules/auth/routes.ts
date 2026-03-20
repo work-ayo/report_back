@@ -18,11 +18,12 @@ const ACCESS_TOKEN_EXPIRES_IN = env.ACCESS_TOKEN_EXPIRES_IN;
 
 const authRoutes: FastifyPluginAsync = async (app) => {
   app.post(`${base}/signup`, { schema: signupSchema }, async (req, reply) => {
-    const body = req.body as { id: string; password: string; name: string };
+    const body = req.body as { id: string; password: string; name: string;    department?: string; };
 
     const id = body.id?.trim();
     const password = (body.password ?? "").trim();
     const name = body.name?.trim();
+    const department = body.department?.trim()
 
     if (!id || id.length < 3) throw E.badRequest("ID_TOO_SHORT", "id too short");
     if (!password || password.length < 8) throw E.badRequest("PASSWORD_TOO_SHORT", "password too short");
@@ -41,9 +42,10 @@ const authRoutes: FastifyPluginAsync = async (app) => {
         id,
         password: hashed,
         name,
+        department: body.department?.trim() || null,
         isActive: true,
       },
-      select: { userId: true, id: true, name: true, isActive: true },
+      select: { userId: true, id: true, name: true, isActive: true ,globalRole:true},
     });
 
     const accessToken = app.jwt.sign(
@@ -224,6 +226,8 @@ app.get(`${base}/me`, { preHandler: [requireAuth], schema: meSchema }, async (re
       name: true,
       isActive: true,
       createdAt: true,
+      globalRole:true,
+      department:true
     },
   });
   if (!user || !user.isActive) throw E.unauthorized("UNAUTHORIZED", "unauthorized");
@@ -278,6 +282,7 @@ app.patch(`${base}/me`, { preHandler: [requireAuth], schema: patchMeSchema }, as
       name: true,
       password: true,
       isActive: true,
+      globalRole:true,
     },
   });
 

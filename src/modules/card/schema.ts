@@ -1,6 +1,6 @@
 import { describe } from "zod/v4/core";
 import { commonErrorResponses } from "../../common/commonResponse.js";
-
+import {iso} from "../../common/utils.js";
 const userMiniShape = {
   type: "object",
   additionalProperties: false,
@@ -42,7 +42,7 @@ export const createCardSchema = {
       content: { type: "string", default: "" },
       projectId: { type: "string", default: "" },
       dueDate: { type: "string", default: "" },
-      md:{type:"integer"}
+      md: { type: "integer", minimum: 0 },
     },
   },
   response: {
@@ -87,7 +87,7 @@ export const createCardSchema = {
 
             createdAt: { type: "string" },
             updatedAt: { type: "string" },
-             md:{type:"integer"}
+            md:{type:"integer"}
           },
         },
       },

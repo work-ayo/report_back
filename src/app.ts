@@ -20,8 +20,12 @@ import columnRoutes from "./modules/column/routes.js";
 import adminProjectRoutes from "./modules/admin/project/routes.js";
 import projectRoutes from "./modules/project/routes.js";
 import summaryRoutes from "./modules/summary/routes.js";
+
+import socketPlugin  from "./plugins/socket.js";
+
 import { logger } from "./common/logger.js";
 import { env } from "./config/env.js";
+
 function shouldSkipAccessLog(url: string) {
   return (
     url.startsWith("/docs") ||
@@ -105,14 +109,19 @@ export default function buildApp() {
     return reply.code(500).send({ code: "INTERNAL_ERROR", message: "internal server error" });
   });
 
+
   app.register(cors, {
     origin: true, credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 
   });
+
+   
    app.register(cookie, {
     secret: env.COOKIE_SECRET,
   })
+
+  app.register(socketPlugin); //소켓서버  
   app.register(formbody);
   app.register(prismaPlugin);
   app.register(jwtPlugin);
