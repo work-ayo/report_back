@@ -1,7 +1,5 @@
 import { commonErrorResponses } from "../../common/commonResponse.js";
 
-
-
 const columnShape = {
   type: "object",
   required: ["columnId", "boardId", "name", "order"],
@@ -310,7 +308,11 @@ export const archiveListSchema = {
                   updatedAt: { type: "string", format: "date-time" },
                   project: {
                     type: ["object", "null"],
-                    nullable: true,
+                    properties:{
+                     projectId: { type: "string" },
+                            name: { type: "string" },
+                            colorCode:{type:"string"}
+                          },
                   },
                   createdBy: {
                     type: "object",

@@ -211,7 +211,7 @@ app.get(
       orderBy: { order: "asc" },
     });
 
-    const archiveColumn = columns.find((col) => col.name === "ARCHIVE");
+    const archiveColumn = columns.find((col) => col.name === "COMPLETED");
 
     const cards = await app.prisma.card.findMany({
       where: { boardId },
