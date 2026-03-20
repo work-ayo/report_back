@@ -270,63 +270,53 @@ export const archiveListSchema = {
   security: [{ bearerAuth: [] }],
   params: {
     type: "object",
-    required: ["boardId"],
+    required: ["boardId", "columnName"],
     properties: {
       boardId: { type: "string" },
+      columnName: { type: "string" },
+    },
+  },
+  querystring: {
+    type: "object",
+    properties: {
+      page: { type: "integer", minimum: 1, default: 1 },
+      pageSize: { type: "integer", minimum: 1, maximum: 100, default: 20 },
     },
   },
   response: {
     200: {
       type: "object",
-      required: ["items"],
       properties: {
-        items: {
-          type: "array",
-          items: {
-            type: "object",
-            required: ["columnId", "boardId", "name", "order", "createdAt", "updatedAt", "cards"],
-            properties: {
-              columnId: { type: "string" },
-              boardId: { type: "string" },
-              name: { type: "string" },
-              order: { type: "integer" },
-              createdAt: { type: "string", format: "date-time" },
-              updatedAt: { type: "string", format: "date-time" },
-              cards: {
-                type: "array",
-                items: {
-                  type: "object",
-                  required: ["cardId", "title", "order", "createdAt", "updatedAt"],
-                  properties: {
-                    cardId: { type: "string" },
-                    dueDate: { type: "string", format: "date-time" },
-                    title: { type: "string" },
-                    content: { type: "string" },
-                    order: { type: "integer" },
-                    createdAt: { type: "string", format: "date-time" },
-                    updatedAt: { type: "string", format: "date-time" },
-                    project: {
-                      anyOf: [
-                        {
-                          type: "object",
-                          properties: {
-                            projectId: { type: "string" },
-                            name: { type: "string" },
-                            colorCode: { type: "string" },
-                          },
-                        },
-                      ],
-                    },
-                    createdBy: {
-                      anyOf: [
-                        {
-                          type: "object",
-                          properties: {
-                            userId: { type: "string" },
-                            name: { type: "string" },
-                          },
-                        },
-                      ],
+        item: {
+          type: "object",
+          properties: {
+            columnId: { type: "string" },
+            boardId: { type: "string" },
+            name: { type: "string" },
+            order: { type: "integer" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            cards: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  cardId: { type: "string" },
+                  dueDate: { type: ["string", "null"], format: "date-time" },
+                  title: { type: "string" },
+                  content: { type: ["string", "null"] },
+                  order: { type: "integer" },
+                  createdAt: { type: "string", format: "date-time" },
+                  updatedAt: { type: "string", format: "date-time" },
+                  project: {
+                    type: ["object", "null"],
+                    nullable: true,
+                  },
+                  createdBy: {
+                    type: "object",
+                    properties: {
+                      userId: { type: "string" },
+                      name: { type: ["string", "null"] },
                     },
                   },
                 },
@@ -334,8 +324,19 @@ export const archiveListSchema = {
             },
           },
         },
+        pagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer" },
+            pageSize: { type: "integer" },
+            total: { type: "integer" },
+            totalPages: { type: "integer" },
+            hasNext: { type: "boolean" },
+            hasPrev: { type: "boolean" },
+          },
+        },
       },
     },
-    ...commonErrorResponses,
+    ...commonErrorResponses
   },
 };

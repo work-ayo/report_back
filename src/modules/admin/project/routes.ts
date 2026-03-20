@@ -177,7 +177,9 @@ app.patch(
     if (body.teamId !== undefined && String(body.teamId).trim().length > 0) data.teamId = String(body.teamId).trim();
     if (body.code !== undefined && String(body.code).trim().length > 0) data.code = String(body.code).trim();
     if (body.name !== undefined && String(body.name).trim().length > 0) data.name = String(body.name).trim();
-
+  if(body.colorCode !== undefined){
+      data.colorCode = body.colorCode;
+    }
     if (body.price !== undefined) {
       const price = parsePrice(body.price);
       if (price === null)
@@ -205,6 +207,8 @@ app.patch(
         data.endDate = d;
       }
     }
+
+    
 
     if (Object.keys(data).length === 0) {
       return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });

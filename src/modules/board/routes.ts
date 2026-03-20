@@ -83,7 +83,7 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
   }
 );
 
-
+/*해당하는 컬럼의 카드리스트 가져오기*/
 app.get(
   "/boards/:boardId/:columnName",
   {
@@ -92,15 +92,16 @@ app.get(
   },
   async (req: any, reply) => {
     const boardId = req.params.boardId as string;
-    const columnName = req.params.columnName;
+    const columnName = req.params.columnName as string;
 
-    const archiveColumns = await app.prisma.column.findMany({
+    const page = Math.max(1, Number(req.query.page ?? 1));
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 20)));
+    const skip = (page - 1) * pageSize;
+
+    const column = await app.prisma.column.findFirst({
       where: {
         boardId,
         name: columnName,
-      },
-      orderBy: {
-        columnId: "asc",
       },
       select: {
         columnId: true,
@@ -109,28 +110,65 @@ app.get(
         order: true,
         createdAt: true,
         updatedAt: true,
-        
-        cards: {
-          orderBy: {
-            updatedAt: "desc",
-          },
-          select: {
-            cardId: true,
-            dueDate: true,
-            title: true,
-            content: true,
-            order: true,
-            createdAt: true,
-            updatedAt: true,
-            project:true,
-          createdBy: { select: { userId: true, name: true } }, 
-          },
-        },
       },
     });
 
+    if (!column) {
+      return reply.status(404).send({
+        code: "COLUMN_NOT_FOUND",
+        message: "column not found",
+      });
+    }
+
+    const [cards, total] = await Promise.all([
+      app.prisma.card.findMany({
+        where: {
+          boardId,
+          columnId: column.columnId,
+        },
+        orderBy: {
+          updatedAt: "desc",
+        },
+        skip,
+        take: pageSize,
+        select: {
+          cardId: true,
+          dueDate: true,
+          title: true,
+          content: true,
+          order: true,
+          createdAt: true,
+          updatedAt: true,
+          project: true,
+          createdBy: {
+            select: {
+              userId: true,
+              name: true,
+            },
+          },
+        },
+      }),
+      app.prisma.card.count({
+        where: {
+          boardId,
+          columnId: column.columnId,
+        },
+      }),
+    ]);
+
     return reply.send({
-      items: archiveColumns,
+      item: {
+        ...column,
+        cards,
+      },
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+        hasNext: skip + pageSize < total,
+        hasPrev: page > 1,
+      },
     });
   }
 );

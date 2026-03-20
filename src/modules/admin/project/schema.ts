@@ -87,7 +87,7 @@ export const adminUpdateProjectSchema = {
       code: { type: "string", maxLength: 40, default: "" },
       name: { type: "string", maxLength: 80, default: "" },
      price: { type: "string", pattern: "^[0-9]+$", default: "0" },
-
+      colorCode:{type:"string"},
       startDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
       endDate: { type: "string", default: "", description: "YYYY-MM-DD (optional)" },
     },
