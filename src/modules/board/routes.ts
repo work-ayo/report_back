@@ -1,7 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import { requireAuth, requireBoardAccess, requireBoardOwnerOrAdmin, requireTeamMember } from "../../common/middleware/auth.js";
 import { createBoardSchema, listBoardsSchema, getBoardDetailSchema,updateBoardSchema,deleteBoardSchema, archiveListSchema } from "./schema.js";
-import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+
 const boardRoutes: FastifyPluginAsync = async (app) => {
 
   // 팀 보드 목록 (팀 멤버만)
@@ -21,7 +22,7 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
       });
 
       return reply.send({
-        boards: boards.map((b) => ({
+        boards: boards.map((b:any) => ({
           ...b,
           createdAt: b.createdAt.toISOString(),
           updatedAt: b.updatedAt.toISOString(),
@@ -47,7 +48,7 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
     if (!name) return reply.status(400).send({ code: "NAME_REQUIRED", message: "name required" });
 
     try {
-      const board = await app.prisma.$transaction(async (tx) => {
+      const board = await app.prisma.$transaction(async (tx:any) => {
         const created = await tx.board.create({
           data: { teamId, name, createdByUserId: userId },
           select: { boardId: true, teamId: true, name: true, createdByUserId: true },
@@ -69,7 +70,7 @@ const boardRoutes: FastifyPluginAsync = async (app) => {
 
       return reply.code(201).send({ board });
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
         const target = (e.meta as any)?.target;
         const keys = Array.isArray(target) ? target.join(",") : String(target ?? "");
         // @@unique([teamId, name]) 충돌
@@ -211,7 +212,7 @@ app.get(
       orderBy: { order: "asc" },
     });
 
-    const archiveColumn = columns.find((col) => col.name === "COMPLETED");
+    const archiveColumn = columns.find((col:any) => col.name === "COMPLETED");
 
     const cards = await app.prisma.card.findMany({
       where: { boardId },
@@ -236,9 +237,9 @@ app.get(
 
     const filteredCards = archiveColumn
       ? [
-          ...cards.filter((c) => c.columnId !== archiveColumn.columnId),
+          ...cards.filter((c:any) => c.columnId !== archiveColumn.columnId),
           ...cards
-            .filter((c) => c.columnId === archiveColumn.columnId)
+            .filter((c:any) => c.columnId === archiveColumn.columnId)
             .slice(0, 5),
         ]
       : cards;
@@ -345,8 +346,8 @@ app.patch(
           updatedAt: updated.updatedAt.toISOString(),
         },
       });
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+    } catch (e:any) {
+      if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
         const target = (e.meta as any)?.target;
         const keys = Array.isArray(target) ? target.join(",") : String(target ?? "");
         if (keys.includes("teamId") && keys.includes("name")) {

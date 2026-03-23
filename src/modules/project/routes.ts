@@ -74,7 +74,7 @@ const projectRoutes: FastifyPluginAsync = async (app) => {
       });
 
       return reply.send({
-        projects: projects.map((p) => ({
+        projects: projects.map((p:any) => ({
           ...p,
           price: p.price.toString(),
           startDate: iso(p.startDate),

@@ -45,14 +45,14 @@ const adminRoutes: FastifyPluginAsync = async (app) => {
       });
 
       // 응답 shape 깔끔하게: teamMembers -> teams
-      const mapped = users.map((u) => ({
+      const mapped = users.map((u:any) => ({
         userId: u.userId,
         id: u.id,
         name: u.name,
         department: u.department,
         globalRole: u.globalRole,
         isActive: u.isActive,
-        teams: (u.memberships ?? []).map((m) => ({
+        teams: (u.memberships ?? []).map((m:any) => ({
           teamId: m.team.teamId,
           name: m.team.name,
           role: m.role ?? null,

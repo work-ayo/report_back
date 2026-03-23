@@ -60,7 +60,7 @@ const adminTeamsRoutes: FastifyPluginAsync = async (app) => {
         joinCode = randomJoinCode(8);
       }
 
-      const result = await app.prisma.$transaction(async (tx) => {
+      const result = await app.prisma.$transaction(async (tx:any) => {
         // 팀 생성
         const team = await tx.team.create({
           data: {
@@ -225,7 +225,7 @@ const adminTeamsRoutes: FastifyPluginAsync = async (app) => {
 
             return reply.send({
                 team,
-                members: members.map((m) => ({
+                members: members.map((m:any) => ({
                     role: m.role,
                     userId: m.user.userId,
                     id: m.user.id,
@@ -286,7 +286,7 @@ const adminTeamsRoutes: FastifyPluginAsync = async (app) => {
             return reply.send({
                 team: { teamId: team.teamId, name: team.name },
                 weekStart: toYmd(ws),
-                items: members.map((m) => ({
+                items: members.map((m:any) => ({
                     userId: m.userId,
                     id: m.user.id,
                     name: m.user.name,

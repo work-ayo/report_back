@@ -50,7 +50,7 @@ const teamRoutes: FastifyPluginAsync = async (app) => {
         orderBy: { joinedAt: "asc" },
       });
 
-      const teams = memberships.map((m) => m.team);
+      const teams = memberships.map((m:any) => m.team);
       return reply.send({ teams });
     }
   );

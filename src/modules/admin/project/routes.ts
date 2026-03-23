@@ -8,7 +8,7 @@ import {
 } from "./schema.js";
 
 import {iso, parsePrice, parseYmdOrInvalid} from "../../../common/utils.js";
-import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { AppError } from "../../../common/errors.js";
 
 
@@ -145,8 +145,8 @@ app.post(
           updatedAt: iso(project.updatedAt),
         },
       });
-    } catch (e) {
-       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+    } catch (e:any) {
+       if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
         const target = Array.isArray((e.meta as any)?.target) ? (e.meta as any).target.join(",") : String((e.meta as any)?.target ?? "");
         if (target.includes("code")) throw new AppError(409, "CODE_EXISTS", "project code already exists");
         if (target.includes("name")) throw new AppError(409, "NAME_EXISTS", "project name already exists in this team");
@@ -255,8 +255,8 @@ app.patch(
           updatedAt: iso(project.updatedAt),
         },
       });
-    } catch(e) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+    } catch(e:any) {
+        if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
     const target = Array.isArray((e.meta as any)?.target) ? (e.meta as any).target.join(",") : String((e.meta as any)?.target ?? "");
     if (target.includes("code")) throw new AppError(409, "CODE_EXISTS", "project code already exists");
     if (target.includes("name")) throw new AppError(409, "NAME_EXISTS", "project name already exists in this team");

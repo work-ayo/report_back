@@ -6,7 +6,7 @@ import {
   deleteColumnSchema,
   moveColumnSchema,
 } from "./schema.js";
-import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 async function assertBoardAccess(app: any, userId: string, boardId: string) {
   const me = await app.prisma.user.findUnique({
@@ -93,8 +93,8 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
         });
 
         return reply.code(201).send({ column });
-      } catch (e) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      } catch (e:any) {
+        if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
           const target = (e.meta as any)?.target;
           const keys = Array.isArray(target) ? target.join(",") : String(target ?? "");
 
@@ -171,8 +171,8 @@ const columnRoutes: FastifyPluginAsync = async (app) => {
         });
 
         return reply.send({ column });
-      } catch (e) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      } catch (e:any) {
+        if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
           const target = (e.meta as any)?.target;
           const keys = Array.isArray(target) ? target.join(",") : String(target ?? "");
 

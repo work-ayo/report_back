@@ -57,7 +57,7 @@ app.get(
     return reply.send({
       startDate: toYmd(startWs),
       endDate: toYmd(endWs),
-      weeks: rows.map((r) => toYmd(r.weekStart)),
+      weeks: rows.map((r:any) => toYmd(r.weekStart)),
     });
   }
 );

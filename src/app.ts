@@ -2,7 +2,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import formbody from "@fastify/formbody";
-import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import prismaPlugin from "./plugins/prisma.js";
 import swaggerPlugin from "./plugins/swagger.js";
 import jwtPlugin from "./plugins/jwt.js";
@@ -69,7 +69,7 @@ export default function buildApp() {
 
 
   //전역 에러 핸들러 (응답 + 로그 통일)
-  app.setErrorHandler((err, req, reply) => {
+  app.setErrorHandler((err:any, req, reply) => {
     //fastify schema validation 에러
     if ((err as any).validation) {
       return reply.code(400).send({
@@ -80,7 +80,7 @@ export default function buildApp() {
     }
 
     // Prisma 에러 매핑
-    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err instanceof PrismaClientKnownRequestError) {
       if (err.code === "P2002") {
         return reply.code(409).send({ code: "CONFLICT", message: "unique constraint failed", details: err.meta });
       }
