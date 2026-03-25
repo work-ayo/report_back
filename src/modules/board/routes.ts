@@ -240,7 +240,7 @@ app.get(
           ...cards.filter((c:any) => c.columnId !== archiveColumn.columnId),
           ...cards
             .filter((c:any) => c.columnId === archiveColumn.columnId)
-            .slice(0, 5),
+            .slice(0, 10),
         ]
       : cards;
 
