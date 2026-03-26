@@ -152,6 +152,7 @@ export const updateCardSchema = {
               properties: {
                 projectId: { type: "string" },
                 name: { type: "string" },
+                colorCode:{type:"string"},
                 // BigInt는 JSON 불가 -> string digits로 내려야 안전
                 price: { type: "string", pattern: "^[0-9]+$" },
               },
