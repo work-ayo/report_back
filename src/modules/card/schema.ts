@@ -196,6 +196,7 @@ export const moveCardSchema = {
   summary: "카드 이동/정렬",
   consumes: ["application/x-www-form-urlencoded"],
   security: [{ bearerAuth: [] }],
+
   params: {
     type: "object",
     required: ["cardId"],
@@ -203,22 +204,37 @@ export const moveCardSchema = {
       cardId: { type: "string" },
     },
   },
+
   body: {
     type: "object",
     required: ["toColumnId", "toIndex"],
     additionalProperties: false,
     properties: {
-      toColumnId: { type: "string", default: "" },
-      toIndex: { type: "integer", minimum: 0, default: 0 }, // 0-based index
+      toColumnId: { type: "string" },
+      toIndex: { type: "integer", minimum: 0 },
     },
   },
+
   response: {
     200: {
       type: "object",
-      required: ["ok"],
-      properties: { ok: { type: "boolean" } },
+      required: ["ok", "card"],
+      properties: {
+        ok: { type: "boolean" },
+        card: {
+          type: "object",
+          required: ["cardId", "boardId", "columnId", "order", "updatedAt"],
+          properties: {
+            cardId: { type: "string" },
+            boardId: { type: "string" },
+            columnId: { type: "string" },
+            order: { type: "number" },
+            updatedAt: { type: "string", format: "string" },
+          },
+        },
+      },
     },
 
-     ...commonErrorResponses
+    ...commonErrorResponses,
   },
 };

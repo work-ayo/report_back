@@ -14,21 +14,20 @@ function parseIsoDateOrNull(v: unknown): Date | null {
   return d;
 }
 
-async function reassignOrdersSafe(tx: any, columnId: string, orderedCardIds: string[]) {
-  for (let i = 0; i < orderedCardIds.length; i++) {
-    await tx.card.update({
-      where: { cardId: orderedCardIds[i] },
-      data: { order: -100000 - i },
-    });
-  }
+function calcOrderForInsert(
+  prevOrder: number | null,
+  nextOrder: number | null
+): number | null {
+  if (prevOrder === null && nextOrder === null) return 0;
+  if (prevOrder === null) return nextOrder! - 1024;
+  if (nextOrder === null) return prevOrder + 1024;
 
-  for (let i = 0; i < orderedCardIds.length; i++) {
-    await tx.card.update({
-      where: { cardId: orderedCardIds[i] },
-      data: { order: i + 1 },
-    });
-  }
+  const gap = nextOrder - prevOrder;
+  if (gap <= 1) return null;
+
+  return Math.floor((prevOrder + nextOrder) / 2);
 }
+
 
 const cardRoutes: FastifyPluginAsync = async (app) => {
   app.post(
@@ -178,10 +177,11 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 
+  //requireMyCard(app, (req: any) => req.params.cardId) 
   app.patch(
     "/card/:cardId",
     {
-      preHandler: [requireAuth, requireMyCard(app, (req: any) => req.params.cardId)],
+      preHandler: [requireAuth],
       schema: updateCardSchema,
     },
     async (req: any, reply) => {
@@ -281,6 +281,8 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
       }
 
+      data.updatedAt = new Date();
+
       const card = await app.prisma.card.update({
         where: { cardId },
         data,
@@ -377,18 +379,11 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
           .send({ code: auth.code, message: auth.message });
       }
 
-   await app.prisma.$transaction(async (tx: any) => {
+await app.prisma.$transaction(async (tx: any) => {
   await tx.card.delete({ where: { cardId } });
-
-  const cards = await tx.card.findMany({
-    where: { columnId: existing.columnId },
-    select: { cardId: true },
-    orderBy: { order: "asc" },
-  });
-
-  const nextIds = cards.map((c: any) => c.cardId);
-  await reassignOrdersSafe(tx, existing.columnId, nextIds);
 });
+
+
 
       app.io.to(`board:${existing.boardId}`).emit("board:event", {
         type: "card:deleted",
@@ -404,113 +399,164 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 
-  app.patch(
-    "/card/:cardId/move",
-    { preHandler: [requireAuth], schema: moveCardSchema },
-    async (req: any, reply) => {
-      const actorUserId = String(req.user?.sub ?? "");
-      const cardId = String(req.params.cardId ?? "");
-      const toColumnId = String(req.body?.toColumnId ?? "");
-      const toIndex = Number(req.body?.toIndex);
-      const requestId = req.headers["x-request-id"]
-        ? String(req.headers["x-request-id"])
-        : null;
+app.patch(
+  "/card/:cardId/move",
+  { preHandler: [requireAuth], schema: moveCardSchema },
+  async (req: any, reply) => {
+    const actorUserId = String(req.user?.sub ?? "");
+    const cardId = String(req.params.cardId ?? "");
+    const toColumnId = String(req.body?.toColumnId ?? "");
+    const toIndex = Number(req.body?.toIndex);
+    const requestId = req.headers["x-request-id"]
+      ? String(req.headers["x-request-id"])
+      : null;
 
-      if (!cardId || !toColumnId || Number.isNaN(toIndex) || toIndex < 0) {
-        return reply.status(400).send({ code: "BAD_REQUEST" });
-      }
+    if (!cardId || !toColumnId || Number.isNaN(toIndex) || toIndex < 0) {
+      return reply.status(400).send({ code: "BAD_REQUEST" });
+    }
 
-      try {
-        const result = await app.prisma.$transaction(async (tx: any) => {
-          const card = await tx.card.findUnique({
+    try {
+      const result = await app.prisma.$transaction(async (tx: any) => {
+        const card = await tx.card.findUnique({
+          where: { cardId },
+          select: {
+            cardId: true,
+            boardId: true,
+            columnId: true,
+            order: true,
+            updatedAt: true,
+          },
+        });
+
+        if (!card) {
+          throw Object.assign(new Error("CARD_NOT_FOUND"), { statusCode: 404 });
+        }
+
+        const targetCol = await tx.column.findUnique({
+          where: { columnId: toColumnId },
+          select: { columnId: true, boardId: true },
+        });
+
+        if (!targetCol) {
+          throw Object.assign(new Error("COLUMN_NOT_FOUND"), { statusCode: 404 });
+        }
+
+        if (card.boardId !== targetCol.boardId) {
+          throw Object.assign(new Error("INVALID_MOVE"), { statusCode: 400 });
+        }
+
+        const boardId = card.boardId;
+        const fromColumnId = card.columnId;
+        const isSameColumn = fromColumnId === toColumnId;
+
+        const movedUpdatedAt = isSameColumn ? null : new Date();
+
+        const toCards = await tx.card.findMany({
+          where: { columnId: toColumnId },
+          orderBy: { order: "asc" },
+          select: { cardId: true, order: true },
+        });
+
+        const filtered = toCards.filter((c: any) => c.cardId !== cardId);
+        const idx = Math.max(0, Math.min(toIndex, filtered.length));
+
+        const prev = idx > 0 ? filtered[idx - 1] : null;
+        const next = idx < filtered.length ? filtered[idx] : null;
+
+        const newOrder = calcOrderForInsert(prev?.order ?? null, next?.order ?? null);
+
+        if (newOrder !== null) {
+          await tx.card.update({
             where: { cardId },
-            select: { cardId: true, boardId: true, columnId: true },
+            data: {
+              columnId: toColumnId,
+              order: newOrder,
+              ...(movedUpdatedAt ? { updatedAt: movedUpdatedAt } : {}),
+            },
           });
-          if (!card) throw Object.assign(new Error("CARD_NOT_FOUND"), { statusCode: 404 });
+        } else {
+          const rebased = [...filtered];
+          rebased.splice(idx, 0, { cardId, order: 0 });
 
-          const targetCol = await tx.column.findUnique({
-            where: { columnId: toColumnId },
-            select: { columnId: true, boardId: true },
-          });
-          if (!targetCol) throw Object.assign(new Error("COLUMN_NOT_FOUND"), { statusCode: 404 });
-
-          if (card.boardId !== targetCol.boardId) {
-            throw Object.assign(new Error("INVALID_MOVE"), { statusCode: 400 });
-          }
-
-          const boardId = card.boardId;
-          const fromColumnId = card.columnId;
-          const isSameColumn = fromColumnId === toColumnId;
-
-          const fromIds = (
-            await tx.card.findMany({
-              where: { columnId: fromColumnId },
-              orderBy: { order: "asc" },
-              select: { cardId: true },
-            })
-          ).map((c: any) => c.cardId);
-
-          const toIdsBase = isSameColumn
-            ? fromIds.slice()
-            : (
-                await tx.card.findMany({
-                  where: { columnId: toColumnId },
-                  orderBy: { order: "asc" },
-                  select: { cardId: true },
-                })
-              ).map((c: any) => c.cardId);
-
-          const nextTo = toIdsBase.filter((id: string) => id !== cardId);
-          const idx = Math.max(0, Math.min(toIndex, nextTo.length));
-          nextTo.splice(idx, 0, cardId);
-
-          if (!isSameColumn) {
+          // 1단계: unique 충돌 피하려고 임시 음수 order 부여
+          for (let i = 0; i < rebased.length; i++) {
             await tx.card.update({
-              where: { cardId },
-              data: { columnId: toColumnId, order: -999999 },
+              where: { cardId: rebased[i].cardId },
+              data: {
+                order: -1000000 - i,
+                ...(rebased[i].cardId === cardId
+                  ? {
+                      columnId: toColumnId,
+                      ...(movedUpdatedAt ? { updatedAt: movedUpdatedAt } : {}),
+                    }
+                  : {}),
+              },
             });
           }
 
-          await reassignOrdersSafe(tx, toColumnId, nextTo);
-
-          if (!isSameColumn) {
-            const nextFrom = fromIds.filter((id: string) => id !== cardId);
-            await reassignOrdersSafe(tx, fromColumnId, nextFrom);
+          // 2단계: 최종 order 부여
+          for (let i = 0; i < rebased.length; i++) {
+            await tx.card.update({
+              where: { cardId: rebased[i].cardId },
+              data: {
+                order: (i + 1) * 1024,
+              },
+            });
           }
+        }
 
-          return {
-            boardId,
-            fromColumnId,
-            toColumnId,
-            toIndex: idx,
-          };
+        const movedCard = await tx.card.findUnique({
+          where: { cardId },
+          select: {
+            cardId: true,
+            boardId: true,
+            columnId: true,
+            order: true,
+            updatedAt: true,
+          },
         });
 
-        app.io.to(`board:${result.boardId}`).emit("board:event", {
-          type: "card:moved",
-          boardId: result.boardId,
-          cardId,
-          fromColumnId: result.fromColumnId,
-          toColumnId: result.toColumnId,
-          toIndex: result.toIndex,
-          actorUserId,
-          requestId,
-          updatedAt: new Date().toISOString(),
-        });
+        if (!movedCard) {
+          throw Object.assign(new Error("CARD_NOT_FOUND"), { statusCode: 404 });
+        }
 
-        return reply.send({ ok: true });
-      } catch (e: any) {
-        req.log.error(e);
-        if (e?.statusCode === 404) {
-          return reply.status(404).send({ code: e.message });
-        }
-        if (e?.statusCode === 400) {
-          return reply.status(400).send({ code: e.message });
-        }
-        return reply.status(500).send({ code: "MOVE_FAILED" });
-      }
+        return {
+          boardId,
+          fromColumnId,
+          toColumnId,
+          toIndex: idx,
+          card: movedCard,
+        };
+      });
+
+      app.io.to(`board:${result.boardId}`).emit("board:event", {
+        type: "card:moved",
+        boardId: result.boardId,
+        cardId: result.card.cardId,
+        fromColumnId: result.fromColumnId,
+        toColumnId: result.toColumnId,
+        toIndex: result.toIndex,
+        actorUserId,
+        requestId,
+        updatedAt: result.card.updatedAt.toISOString(),
+      });
+
+      return reply.send({
+        ok: true,
+        card: {
+          ...result.card,
+          updatedAt: result.card.updatedAt.toISOString(),
+        },
+      });
+    } catch (e: any) {
+      const code = Number(e?.statusCode ?? 500);
+      return reply.status(code).send({
+        code: e?.message ?? "INTERNAL_SERVER_ERROR",
+        message: e?.message ?? "internal server error",
+      });
     }
-  );
+  }
+);
 };
 
 export default cardRoutes;

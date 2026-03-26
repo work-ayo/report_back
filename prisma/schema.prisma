@@ -205,7 +205,7 @@ model Card {
   createdBy       User   @relation("CardCreator", fields: [createdByUserId], references: [userId], onDelete: Cascade)
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now())
 
   board  Board  @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
   column Column @relation(fields: [columnId], references: [columnId], onDelete: Cascade)
