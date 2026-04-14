@@ -87,6 +87,7 @@ export const createCardSchema = {
 
             createdAt: { type: "string" },
             updatedAt: { type: "string" },
+               contentUpdateAt: { type: "string" },
             md:{type:"integer"}
           },
         },
@@ -162,6 +163,7 @@ export const updateCardSchema = {
             createdByUserId: { type: "string" },
             createdAt: { type: "string" },
             updatedAt: { type: "string" },
+            contentUpdateAt: { type: "string" },
              md:{type:"integer"}
           },
         },

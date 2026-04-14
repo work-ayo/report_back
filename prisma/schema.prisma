@@ -204,6 +204,7 @@ model Card {
   createdByUserId String @db.VarChar(32)
   createdBy       User   @relation("CardCreator", fields: [createdByUserId], references: [userId], onDelete: Cascade)
 
+  contentUpdateAt DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now())
 

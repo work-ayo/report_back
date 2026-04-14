@@ -227,6 +227,7 @@ app.get(
         createdAt: true,
         updatedAt: true,
         project: true,
+        contentUpdateAt: true,
         md:true,
         createdBy: {
           select: { userId: true, name: true },

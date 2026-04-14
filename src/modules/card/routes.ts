@@ -211,77 +211,87 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
       if (!auth.ok) {
         return reply.status(auth.status).send({ code: auth.code, message: auth.message });
       }
+const data: any = {};
+let shouldUpdateContentAt = false;
 
-      const data: any = {};
+if (body.title !== undefined) {
+  const t = String(body.title ?? "").trim();
+  if (!t) {
+    return reply.status(400).send({ code: "TITLE_REQUIRED", message: "title required" });
+  }
+  data.title = t;
+  shouldUpdateContentAt = true;
+}
 
-      if (body.title !== undefined) {
-        const t = String(body.title ?? "").trim();
-        if (!t) {
-          return reply.status(400).send({ code: "TITLE_REQUIRED", message: "title required" });
-        }
-        data.title = t;
-      }
+if (body.content !== undefined) {
+  const c = String(body.content ?? "").trim();
+  data.content = c.length > 0 ? c : null;
+  shouldUpdateContentAt = true;
+}
 
-      if (body.content !== undefined) {
-        const c = String(body.content ?? "").trim();
-        data.content = c.length > 0 ? c : null;
-      }
+if (body.dueDate !== undefined) {
+  const s = String(body.dueDate ?? "").trim();
+  if (!s) {
+    data.dueDate = null;
+  } else {
+    const d = parseIsoDateOrNull(s);
+    if (!d) {
+      return reply.status(400).send({ code: "INVALID_DUEDATE", message: "invalid dueDate" });
+    }
+    data.dueDate = d;
+  }
+  shouldUpdateContentAt = true;
+}
 
-      if (body.dueDate !== undefined) {
-        const s = String(body.dueDate ?? "").trim();
-        if (!s) {
-          data.dueDate = null;
-        } else {
-          const d = parseIsoDateOrNull(s);
-          if (!d) {
-            return reply.status(400).send({ code: "INVALID_DUEDATE", message: "invalid dueDate" });
-          }
-          data.dueDate = d;
-        }
-      }
+if (body.projectId !== undefined) {
+  const pid = String(body.projectId ?? "").trim();
 
-      if (body.projectId !== undefined) {
-        const pid = String(body.projectId ?? "").trim();
+  if (!pid) {
+    data.projectId = null;
+  } else {
+    const board = await app.prisma.board.findUnique({
+      where: { boardId: existing.boardId },
+      select: { teamId: true },
+    });
+    if (!board) {
+      return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
+    }
 
-        if (!pid) {
-          data.projectId = null;
-        } else {
-          const board = await app.prisma.board.findUnique({
-            where: { boardId: existing.boardId },
-            select: { teamId: true },
-          });
-          if (!board) {
-            return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
-          }
+    const project = await app.prisma.project.findUnique({
+      where: { projectId: pid },
+      select: { teamId: true },
+    });
+    if (!project) {
+      return reply.status(404).send({ code: "PROJECT_NOT_FOUND", message: "project not found" });
+    }
+    if (project.teamId !== board.teamId) {
+      return reply.status(400).send({ code: "INVALID_PROJECT", message: "project is not in the same team" });
+    }
 
-          const project = await app.prisma.project.findUnique({
-            where: { projectId: pid },
-            select: { teamId: true },
-          });
-          if (!project) {
-            return reply.status(404).send({ code: "PROJECT_NOT_FOUND", message: "project not found" });
-          }
-          if (project.teamId !== board.teamId) {
-            return reply.status(400).send({ code: "INVALID_PROJECT", message: "project is not in the same team" });
-          }
+    data.projectId = pid;
+  }
 
-          data.projectId = pid;
-        }
-      }
+  shouldUpdateContentAt = true;
+}
 
-      if (body.md !== undefined) {
-        const md = Number(body.md);
-        if (!Number.isInteger(md) || md < 0) {
-          return reply.status(400).send({ code: "INVALID_MD", message: "invalid md period" });
-        }
-        data.md = md;
-      }
+if (body.md !== undefined) {
+  const md = Number(body.md);
+  if (!Number.isInteger(md) || md < 0) {
+    return reply.status(400).send({ code: "INVALID_MD", message: "invalid md period" });
+  }
+  data.md = md;
+  shouldUpdateContentAt = true;
+}
 
-      if (Object.keys(data).length === 0) {
-        return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
-      }
+if (Object.keys(data).length === 0) {
+  return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
+}
 
-      data.updatedAt = new Date();
+data.updatedAt = new Date();
+
+if (shouldUpdateContentAt) {
+  data.contentUpdateAt = new Date();
+}
 
       const card = await app.prisma.card.update({
         where: { cardId },
@@ -296,6 +306,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
           order: true,
           createdAt: true,
           updatedAt: true,
+          contentUpdateAt: true,
           md: true,
           projectId: true,
           createdByUserId: true,

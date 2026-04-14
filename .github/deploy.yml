@@ -1,0 +1,108 @@
+name: Deploy Back
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy-back-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, windows]
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install
+        shell: powershell
+        run: npm ci
+      - name: Write env file
+        shell: powershell
+        run: |
+          $envText = @"
+          ${{ secrets.BACKEND_ENV }}
+          "@
+              [System.IO.File]::WriteAllText(
+                ".env",
+                $envText,
+                [System.Text.UTF8Encoding]::new($false)
+              )
+      - name: Generate Prisma Client
+        shell: powershell
+        run: npx prisma generate
+
+      - name: Build
+        shell: powershell
+        run: npm run build
+
+      - name: Prepare deploy folder
+        shell: powershell
+        run: |
+          $target = "C:\Users\cloud\Desktop\Inventory\back"
+
+          if (!(Test-Path $target)) {
+            New-Item -ItemType Directory -Path $target | Out-Null
+          }
+
+          if (Test-Path "$target\dist") { Remove-Item "$target\dist" -Recurse -Force }
+          if (Test-Path "$target\prisma") { Remove-Item "$target\prisma" -Recurse -Force }
+
+          Copy-Item "dist" "$target\dist" -Recurse -Force
+          Copy-Item "prisma" "$target\prisma" -Recurse -Force
+          if (!(Test-Path "$target\uploads")) {
+            New-Item -ItemType Directory -Path "$target\uploads" | Out-Null
+          }
+
+          # if (Test-Path "uploads") {
+          #   if (Test-Path "$target\uploads") { Remove-Item "$target\uploads" -Recurse -Force }
+          #   Copy-Item "uploads" "$target\uploads" -Recurse -Force
+          # }
+
+          Copy-Item "package.json" "$target\package.json" -Force
+
+          if (Test-Path "package-lock.json") {
+            Copy-Item "package-lock.json" "$target\package-lock.json" -Force
+          }
+
+          Copy-Item ".env" "$target\.env" -Force
+
+      - name: Stop backend service
+        shell: powershell
+        run: |
+          C:\Users\cloud\Downloads\nssm-2.24\win64\nssm.exe stop inventory-back
+          Start-Sleep -Seconds 3
+
+      - name: Install deps on server
+        shell: powershell
+        run: |
+          $target = "C:\Users\cloud\Desktop\Inventory\back"
+          Set-Location $target
+
+          if (Test-Path "node_modules") {
+            Remove-Item "node_modules" -Recurse -Force
+          }
+
+          npm ci
+
+      - name: Generate Prisma Client on server
+        shell: powershell
+        run: |
+          $target = "C:\Users\cloud\Desktop\Inventory\back"
+          Set-Location $target
+          npx prisma generate
+
+      - name: Start backend service
+        shell: powershell
+        run: |
+          C:\Users\cloud\Downloads\nssm-2.24\win64\nssm.exe start inventory-back

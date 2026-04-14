@@ -71,6 +71,7 @@ const cardShape = {
     order: { type: "integer" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
+    contentUpdateAt: { type: "string" },
     createdBy: createdByShape,
    dueDate: { type: ["string", "null"],},
       md:{type:"integer"},
