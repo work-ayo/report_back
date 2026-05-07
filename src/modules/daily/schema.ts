@@ -1,0 +1,3 @@
+import { commonErrorResponses } from "../../common/commonResponse.js";
+export const upsertDailyReportSchema = { tags:["daily"], security:[{bearerAuth:[]}], body:{ type:"object", required:["teamId","workedAt","content"], properties:{ teamId:{type:"string"}, cardId:{type:"string"}, workedAt:{type:"string"}, content:{type:"string"}}}, response:{200:{type:"object"}, ...commonErrorResponses}};
+export const listDailyReportsSchema = { tags:["daily"], security:[{bearerAuth:[]}], querystring:{ type:"object", required:["teamId"], properties:{ teamId:{type:"string"}, from:{type:"string"}, to:{type:"string"}}}, response:{200:{type:"object"}, ...commonErrorResponses}};

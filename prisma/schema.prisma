@@ -51,6 +51,8 @@ model User {
   reports        WeeklyReport[]
   boardsCreated  Board[]
   cardsCreated   Card[]        @relation("CardCreator")
+  cardsAssigned  Card[]        @relation("CardAssignee")
+  dailyReports   DailyReport[]
 
   columnsCreated  Column[]   @relation("ColumnCreator")
   projectsCreated Project[]  @relation("ProjectCreator")
@@ -70,6 +72,7 @@ model Team {
 
   members  TeamMember[]
   reports  WeeklyReport[]
+  dailyReports DailyReport[]
   boards   Board[]
   projects Project[]
 }
@@ -203,6 +206,8 @@ model Card {
 
   createdByUserId String @db.VarChar(32)
   createdBy       User   @relation("CardCreator", fields: [createdByUserId], references: [userId], onDelete: Cascade)
+  assigneeUserId  String? @db.VarChar(32)
+  assignee        User?   @relation("CardAssignee", fields: [assigneeUserId], references: [userId], onDelete: SetNull)
 
   contentUpdateAt DateTime @default(now())
   createdAt DateTime @default(now())
@@ -210,9 +215,29 @@ model Card {
 
   board  Board  @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
   column Column @relation(fields: [columnId], references: [columnId], onDelete: Cascade)
+  dailyReports DailyReport[]
 
   @@unique([columnId, order])
   @@index([boardId])
   @@index([columnId])
   @@index([projectId])
+  @@index([assigneeUserId])
+}
+
+model DailyReport {
+  dailyReportId String   @id @default(cuid()) @db.VarChar(32)
+  teamId        String   @db.VarChar(32)
+  userId        String   @db.VarChar(32)
+  cardId        String?  @db.VarChar(32)
+  workedAt      DateTime
+  content       String   @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  team Team @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  card Card? @relation(fields: [cardId], references: [cardId], onDelete: SetNull)
+
+  @@index([teamId, workedAt])
+  @@index([userId, workedAt])
 }

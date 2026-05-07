@@ -147,6 +147,7 @@ app.get(
               name: true,
             },
           },
+          assignee: { select: { userId: true, name: true } },
         },
       }),
       app.prisma.card.count({
@@ -232,6 +233,7 @@ app.get(
         createdBy: {
           select: { userId: true, name: true },
         },
+        assignee: { select: { userId: true, name: true } },
       },
       orderBy: [{ order: "asc" }],
     });

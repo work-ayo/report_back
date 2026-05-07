@@ -20,6 +20,7 @@ import columnRoutes from "./modules/column/routes.js";
 import adminProjectRoutes from "./modules/admin/project/routes.js";
 import projectRoutes from "./modules/project/routes.js";
 import summaryRoutes from "./modules/summary/routes.js";
+import dailyRoutes from "./modules/daily/routes.js";
 
 import socketPlugin  from "./plugins/socket.js";
 
@@ -139,6 +140,7 @@ export default function buildApp() {
       api.register(projectRoutes);
       api.register(teamRoutes);
       api.register(weeklyRoutes);
+      api.register(dailyRoutes);
 
       api.register(boardRoutes);
       api.register(cardRoutes);

@@ -46,6 +46,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
         projectId?: string;
         dueDate?: string;
         md?: number;
+        assigneeUserId?: string;
       };
 
       const columnId = String(body.columnId ?? "").trim();
@@ -53,6 +54,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
       const content = String(body.content ?? "").trim();
       const projectId = String(body.projectId ?? "").trim() || null;
       const md = body.md ?? 0;
+      const assigneeUserId = String(body.assigneeUserId ?? "").trim() || null;
 
       if (md < 0) {
         return reply.status(400).send({ code: "INVALID_MD", message: "invalid md period" });
@@ -82,6 +84,11 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
       });
       if (!board) {
         return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
+      }
+
+      if (assigneeUserId) {
+        const member = await app.prisma.teamMember.findFirst({ where: { userId: assigneeUserId, teamId: board.teamId }, select: { id: true } });
+        if (!member) return reply.status(400).send({ code: "INVALID_ASSIGNEE", message: "assignee is not a team member" });
       }
 
       if (projectId) {
@@ -115,6 +122,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
           order: nextOrder,
           createdByUserId: userId,
           md,
+          assigneeUserId,
         },
         select: {
           cardId: true,
@@ -130,6 +138,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
           md: true,
           createdByUserId: true,
           createdBy: { select: { userId: true, id: true, name: true } },
+          assignee: { select: { userId: true, id: true, name: true } },
           project: {
             select: {
               projectId: true,
@@ -197,6 +206,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
         projectId?: string;
         dueDate?: string;
         md?: number;
+        assigneeUserId?: string;
       };
 
       const existing = await app.prisma.card.findUnique({
@@ -274,6 +284,19 @@ if (body.projectId !== undefined) {
   shouldUpdateContentAt = true;
 }
 
+if (body.assigneeUserId !== undefined) {
+  const auid = String(body.assigneeUserId ?? "").trim();
+  if (!auid) { data.assigneeUserId = null; }
+  else {
+    const board = await app.prisma.board.findUnique({ where: { boardId: existing.boardId }, select: { teamId: true } });
+    if (!board) return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
+    const member = await app.prisma.teamMember.findFirst({ where: { userId: auid, teamId: board.teamId }, select: { id: true } });
+    if (!member) return reply.status(400).send({ code: "INVALID_ASSIGNEE", message: "assignee is not a team member" });
+    data.assigneeUserId = auid;
+  }
+  shouldUpdateContentAt = true;
+}
+
 if (body.md !== undefined) {
   const md = Number(body.md);
   if (!Number.isInteger(md) || md < 0) {
@@ -317,6 +340,7 @@ if (shouldUpdateContentAt) {
               name: true,
             },
           },
+          assignee: { select: { userId: true, id: true, name: true } },
           project: {
             select: {
               projectId: true,
