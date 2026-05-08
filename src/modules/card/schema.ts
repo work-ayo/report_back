@@ -44,6 +44,7 @@ export const createCardSchema = {
       dueDate: { type: "string", default: "" },
       md: { type: "integer", minimum: 0 },
       assigneeUserId: { type: "string", default: "" },
+      taskId: { type: "string", default: "" },
     },
   },
   response: {
@@ -123,6 +124,7 @@ export const updateCardSchema = {
        md:{type:"integer"},
       projectId: { type: "string", default: "" }, // ""이면 null로 처리하는 로직이면 OK
       assigneeUserId: { type: "string", default: "" },
+      taskId: { type: "string", default: "" },
     },
   },
 

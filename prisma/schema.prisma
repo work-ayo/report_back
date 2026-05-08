@@ -15,6 +15,7 @@ enum GlobalRole {
 }
 
 enum TeamRole {
+  LEADER
   MEMBER
 }
 
@@ -53,6 +54,7 @@ model User {
   cardsCreated   Card[]        @relation("CardCreator")
   cardsAssigned  Card[]        @relation("CardAssignee")
   dailyReports   DailyReport[]
+  tasksCreated   Task[]        @relation("TaskCreator")
 
   columnsCreated  Column[]   @relation("ColumnCreator")
   projectsCreated Project[]  @relation("ProjectCreator")
@@ -75,6 +77,7 @@ model Team {
   dailyReports DailyReport[]
   boards   Board[]
   projects Project[]
+  tasks    Task[]
 }
 
 model TeamMember {
@@ -181,6 +184,7 @@ model Project {
 
   team  Team  @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
   cards Card[]
+  tasks Task[]
 
   @@unique([teamId, code])
   @@unique([teamId, name])
@@ -195,6 +199,8 @@ model Card {
 
   projectId String?  @db.VarChar(32)
   project   Project? @relation(fields: [projectId], references: [projectId], onDelete: SetNull)
+  taskId    String?  @db.VarChar(32)
+  task      Task?    @relation(fields: [taskId], references: [taskId], onDelete: SetNull)
 
   title   String  @db.VarChar(200)
   content String? @db.Text
@@ -215,29 +221,78 @@ model Card {
 
   board  Board  @relation(fields: [boardId], references: [boardId], onDelete: Cascade)
   column Column @relation(fields: [columnId], references: [columnId], onDelete: Cascade)
-  dailyReports DailyReport[]
 
   @@unique([columnId, order])
   @@index([boardId])
   @@index([columnId])
   @@index([projectId])
+  @@index([taskId])
   @@index([assigneeUserId])
+}
+
+model Task {
+  taskId           String    @id @default(cuid()) @db.VarChar(32)
+  teamId           String    @db.VarChar(32)
+  projectId        String?   @db.VarChar(32)
+  title            String    @db.VarChar(200)
+  description      String?   @db.Text
+  startDate        DateTime?
+  endDate          DateTime?
+  progress         Int       @default(0)
+  parentTaskId     String?   @db.VarChar(32)
+  createdByUserId  String?   @db.VarChar(32)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  team             Team      @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
+  project          Project?  @relation(fields: [projectId], references: [projectId], onDelete: SetNull)
+  parentTask       Task?     @relation("TaskTree", fields: [parentTaskId], references: [taskId], onDelete: SetNull)
+  children         Task[]    @relation("TaskTree")
+  cards            Card[]
+  dailyReportEntries DailyReportEntry[]
+  createdBy        User?     @relation("TaskCreator", fields: [createdByUserId], references: [userId], onDelete: SetNull)
+
+  @@index([teamId])
+  @@index([projectId])
+  @@index([parentTaskId])
+  @@index([createdByUserId])
 }
 
 model DailyReport {
   dailyReportId String   @id @default(cuid()) @db.VarChar(32)
   teamId        String   @db.VarChar(32)
   userId        String   @db.VarChar(32)
-  cardId        String?  @db.VarChar(32)
-  workedAt      DateTime
-  content       String   @db.Text
+  workDate      DateTime
+  summary       String?  @db.Text
+  issue         String?  @db.Text
+  plan          String?  @db.Text
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  team Team @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  card Card? @relation(fields: [cardId], references: [cardId], onDelete: SetNull)
+  team    Team @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
+  user    User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  entries DailyReportEntry[]
 
-  @@index([teamId, workedAt])
-  @@index([userId, workedAt])
+  @@unique([teamId, userId, workDate])
+  @@index([teamId, workDate])
+  @@index([userId, workDate])
+}
+
+model DailyReportEntry {
+  entryId        String   @id @default(cuid()) @db.VarChar(32)
+  dailyReportId  String   @db.VarChar(32)
+  taskId         String?  @db.VarChar(32)
+  startTime      DateTime
+  endTime        DateTime?
+  title          String   @db.VarChar(200)
+  content        String?  @db.Text
+  minutes        Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  dailyReport DailyReport @relation(fields: [dailyReportId], references: [dailyReportId], onDelete: Cascade)
+  task        Task?       @relation(fields: [taskId], references: [taskId], onDelete: SetNull)
+
+  @@index([dailyReportId])
+  @@index([taskId])
 }

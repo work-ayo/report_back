@@ -1,0 +1,4 @@
+import { commonErrorResponses } from "../../common/commonResponse.js";
+export const listTasksSchema={querystring:{type:"object",required:["teamId"],properties:{teamId:{type:"string"},projectId:{type:"string"}}},response:{200:{type:"object"},...commonErrorResponses}};
+export const createTaskSchema={body:{type:"object",required:["teamId","title"],properties:{teamId:{type:"string"},projectId:{type:"string"},title:{type:"string"},description:{type:"string"},startDate:{type:"string"},endDate:{type:"string"},progress:{type:"integer"},parentTaskId:{type:"string"}}},response:{200:{type:"object"},...commonErrorResponses}};
+export const updateTaskSchema={params:{type:"object",required:["taskId"],properties:{taskId:{type:"string"}}},body:{type:"object",properties:{title:{type:"string"},description:{type:"string"},startDate:{type:"string"},endDate:{type:"string"},progress:{type:"integer"},parentTaskId:{type:"string"}}},response:{200:{type:"object"},...commonErrorResponses}};

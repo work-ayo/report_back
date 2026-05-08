@@ -47,6 +47,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
         dueDate?: string;
         md?: number;
         assigneeUserId?: string;
+        taskId?: string;
       };
 
       const columnId = String(body.columnId ?? "").trim();
@@ -55,6 +56,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
       const projectId = String(body.projectId ?? "").trim() || null;
       const md = body.md ?? 0;
       const assigneeUserId = String(body.assigneeUserId ?? "").trim() || null;
+      const taskId = String(body.taskId ?? "").trim() || null;
 
       if (md < 0) {
         return reply.status(400).send({ code: "INVALID_MD", message: "invalid md period" });
@@ -91,6 +93,12 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
         if (!member) return reply.status(400).send({ code: "INVALID_ASSIGNEE", message: "assignee is not a team member" });
       }
 
+      if (taskId) {
+        const task = await app.prisma.task.findUnique({ where: { taskId }, select: { teamId: true } });
+        if (!task) return reply.status(404).send({ code: "TASK_NOT_FOUND", message: "task not found" });
+        if (task.teamId !== board.teamId) return reply.status(400).send({ code: "INVALID_TASK", message: "task is not in same team" });
+      }
+
       if (projectId) {
         const project = await app.prisma.project.findUnique({
           where: { projectId },
@@ -123,6 +131,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
           createdByUserId: userId,
           md,
           assigneeUserId,
+          taskId,
         },
         select: {
           cardId: true,
@@ -139,6 +148,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
           createdByUserId: true,
           createdBy: { select: { userId: true, id: true, name: true } },
           assignee: { select: { userId: true, id: true, name: true } },
+          task: { select: { taskId: true, title: true, startDate: true, endDate: true, progress: true, project: { select: { projectId: true, name: true } } } },
           project: {
             select: {
               projectId: true,
@@ -207,6 +217,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
         dueDate?: string;
         md?: number;
         assigneeUserId?: string;
+        taskId?: string;
       };
 
       const existing = await app.prisma.card.findUnique({
@@ -284,6 +295,18 @@ if (body.projectId !== undefined) {
   shouldUpdateContentAt = true;
 }
 
+if (body.taskId !== undefined) {
+  const tid = String(body.taskId ?? "").trim();
+  if (!tid) data.taskId = null;
+  else {
+    const task = await app.prisma.task.findUnique({ where: { taskId: tid }, select: { teamId: true } });
+    const board = await app.prisma.board.findUnique({ where: { boardId: existing.boardId }, select: { teamId: true } });
+    if (!board || !task || task.teamId !== board.teamId) return reply.status(400).send({ code: "INVALID_TASK", message: "task is not in same team" });
+    data.taskId = tid;
+  }
+  shouldUpdateContentAt = true;
+}
+
 if (body.assigneeUserId !== undefined) {
   const auid = String(body.assigneeUserId ?? "").trim();
   if (!auid) { data.assigneeUserId = null; }
@@ -341,6 +364,7 @@ if (shouldUpdateContentAt) {
             },
           },
           assignee: { select: { userId: true, id: true, name: true } },
+          task: { select: { taskId: true, title: true, startDate: true, endDate: true, progress: true, project: { select: { projectId: true, name: true } } } },
           project: {
             select: {
               projectId: true,
