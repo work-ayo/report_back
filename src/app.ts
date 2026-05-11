@@ -20,11 +20,13 @@ import columnRoutes from "./modules/column/routes.js";
 import adminProjectRoutes from "./modules/admin/project/routes.js";
 import projectRoutes from "./modules/project/routes.js";
 import summaryRoutes from "./modules/summary/routes.js";
+import adminDailyReportRoutes from "./modules/admin/dailyReport/routes.js";
 
 import socketPlugin  from "./plugins/socket.js";
 
 import { logger } from "./common/logger.js";
 import { env } from "./config/env.js";
+import dailyReportRoutes from "./modules/dailyReport/routes.js";
 
 function shouldSkipAccessLog(url: string) {
   return (
@@ -132,13 +134,14 @@ export default function buildApp() {
       api.register(adminRoutes);
       api.register(adminTeamRoutes);
       api.register(adminProjectRoutes);
-
+      api.register(adminDailyReportRoutes);
       api.register(summaryRoutes);
 
       api.register(authRoutes);
       api.register(projectRoutes);
       api.register(teamRoutes);
       api.register(weeklyRoutes);
+      await api.register(dailyReportRoutes);
 
       api.register(boardRoutes);
       api.register(cardRoutes);

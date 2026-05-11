@@ -51,6 +51,8 @@ model User {
   reports        WeeklyReport[]
   boardsCreated  Board[]
   cardsCreated   Card[]        @relation("CardCreator")
+  dailyReports DailyReportEntry[]
+
 
   columnsCreated  Column[]   @relation("ColumnCreator")
   projectsCreated Project[]  @relation("ProjectCreator")
@@ -67,7 +69,7 @@ model Team {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
+dailyReports DailyReportEntry[]
   members  TeamMember[]
   reports  WeeklyReport[]
   boards   Board[]
@@ -169,7 +171,7 @@ model Project {
   // 프로젝트 시작, 마감일
   startDate DateTime?
   endDate   DateTime?
-
+dailyReportEntries DailyReportEntry[]
   createdByUserId String? @db.VarChar(32)
   createdBy       User?   @relation("ProjectCreator", fields: [createdByUserId], references: [userId], onDelete: SetNull)
 
@@ -214,5 +216,32 @@ model Card {
   @@unique([columnId, order])
   @@index([boardId])
   @@index([columnId])
+  @@index([projectId])
+}
+
+model DailyReportEntry {
+  dailyReportEntryId String @id @default(cuid()) @db.VarChar(32)
+
+  teamId String @db.VarChar(32)
+  userId String @db.VarChar(32)
+
+  projectId String?  @db.VarChar(32)
+  project   Project? @relation(fields: [projectId], references: [projectId], onDelete: SetNull)
+
+  reportDate DateTime
+
+  startTime String @db.VarChar(5)
+  endTime   String @db.VarChar(5)
+
+  content String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team Team @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([teamId, reportDate])
+  @@index([userId, reportDate])
   @@index([projectId])
 }
