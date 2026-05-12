@@ -32,8 +32,15 @@ function getDateRange(startDate: string, endDate: string) {
 function diffMinutes(start?: string | null, end?: string | null) {
   if (!start || !end) return 0;
 
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
+  const startParts = start.split(":");
+  const endParts = end.split(":");
+
+  if (startParts.length !== 2 || endParts.length !== 2) return 0;
+
+  const sh = Number(startParts[0]);
+  const sm = Number(startParts[1]);
+  const eh = Number(endParts[0]);
+  const em = Number(endParts[1]);
 
   if (
     Number.isNaN(sh) ||
