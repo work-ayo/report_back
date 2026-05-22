@@ -70,3 +70,48 @@ export const leaveMyTeamSchema = {
   },
 };
 
+
+export const TeamMemberListSchema = {
+  tags: ["team"],
+  summary: "팀 멤버 목록 조회",
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: "object",
+    required: ["teamId"],
+    properties: { teamId: { type: "string" } },
+  },
+  response: {
+    200: {
+      type: "object",
+      required: ["members"],
+      properties: {
+        team:{
+            type: "object",
+            required: ["teamId", "name", "joinCode"],
+            properties: {
+              teamId: { type: "string" },
+              name: { type: "string" },
+              joinCode: { type: "string" },
+            },
+        },
+        members: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["userId", "id", "name", "department", "globalRole", "role", "isActive"],
+            properties: {
+              userId: { type: "string" },
+              id: { type: "string" },
+              name: { type: "string" },
+              department: { type: ["string", "null"] },
+              globalRole: { type: "string" },
+              role: { type: "string" }, // TeamRole
+              isActive: { type: "boolean" },
+            },
+          },
+        },
+      },
+    },
+   ...commonErrorResponses
+  },
+};

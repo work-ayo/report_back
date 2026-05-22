@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { requireAuth, requireTeamMember } from "../../common/middleware/auth.js";
-import { joinTeamSchema, getMyTeamsSchema, leaveMyTeamSchema } from "./schema.js";
+import { joinTeamSchema, getMyTeamsSchema, leaveMyTeamSchema, TeamMemberListSchema } from "./schema.js";
 
 const base = "/teams"
 const teamRoutes: FastifyPluginAsync = async (app) => {
@@ -50,30 +50,142 @@ const teamRoutes: FastifyPluginAsync = async (app) => {
         orderBy: { joinedAt: "asc" },
       });
 
-      const teams = memberships.map((m:any) => m.team);
+      const teams = memberships.map((m: any) => m.team);
       return reply.send({ teams });
     }
   );
 
-app.delete(
-  `${base}/:teamId/me`,
-  {
-    preHandler: [requireAuth, requireTeamMember(app, (req: any) => req.params.teamId)],
-    schema: leaveMyTeamSchema,
-  },
-  async (req: any, reply) => {
-    const teamId = req.params.teamId as string;
-    const userId = req.user.sub as string;
+  app.get(
+    `${base}/:teamId/members`,
+    {
+      preHandler: [
+        requireAuth,
 
-    await app.prisma.teamMember.delete({
-      where: {
-        teamId_userId: { teamId, userId },
-      },
-    });
+        requireTeamMember(
+          app,
+          (req: any) =>
+            req.params.teamId
+        ),
+      ],
 
-    return reply.send({ok:true});
-  }
-);
+      schema:
+        TeamMemberListSchema,
+    },
+
+    async (
+      req: any,
+      reply
+    ) => {
+      const teamId =
+        req.params.teamId as string;
+
+      const team =
+        await app.prisma.team.findUnique(
+          {
+            where: {
+              teamId,
+            },
+
+            select: {
+              teamId: true,
+              name: true,
+              joinCode: true,
+            },
+          }
+        );
+
+      if (!team) {
+        return reply
+          .code(404)
+          .send({
+            code:
+              "TEAM_NOT_FOUND",
+
+            message:
+              "team not found",
+          });
+      }
+
+      const members =
+        await app.prisma.teamMember.findMany(
+          {
+            where: {
+              teamId,
+            },
+
+            select: {
+              role: true,
+
+              user: {
+                select: {
+                  userId: true,
+                  id: true,
+                  name: true,
+                  department: true,
+                  globalRole: true,
+                  isActive: true,
+                },
+              },
+            },
+
+            orderBy: {
+              joinedAt: "asc",
+            },
+          }
+        );
+
+      return reply.send({
+        team,
+
+        members:
+          members.map(
+            (m: any) => ({
+              role: m.role,
+
+              userId:
+                m.user.userId,
+
+              id: m.user.id,
+
+              name:
+                m.user.name,
+
+              department:
+                m.user.department,
+
+              globalRole:
+                m.user
+                  .globalRole,
+
+              isActive:
+                m.user
+                  .isActive,
+            })
+          ),
+      });
+    }
+  );
+
+
+  app.delete(
+    `${base}/:teamId/me`,
+    {
+      preHandler: [requireAuth, requireTeamMember(app, (req: any) => req.params.teamId)],
+      schema: leaveMyTeamSchema,
+    },
+    async (req: any, reply) => {
+      const teamId = req.params.teamId as string;
+      const userId = req.user.sub as string;
+
+      await app.prisma.teamMember.delete({
+        where: {
+          teamId_userId: { teamId, userId },
+        },
+      });
+
+      return reply.send({ ok: true });
+    }
+  );
 
 };
 

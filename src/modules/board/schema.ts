@@ -49,6 +49,7 @@ const boardShape = {
 
 const cardShape = {
   type: "object",
+
   required: [
     "cardId",
     "boardId",
@@ -62,21 +63,78 @@ const cardShape = {
     "createdBy",
     "project",
   ],
+
   properties: {
-    cardId: { type: "string" },
-    boardId: { type: "string" },
-    columnId: { type: "string" },
-    title: { type: "string" },
-    content: { type: ["string", "null"] },
-    order: { type: "integer" },
-    createdAt: { type: "string" },
-    updatedAt: { type: "string" },
-    contentUpdateAt: { type: "string" },
-    createdBy: createdByShape,
-   dueDate: { type: ["string", "null"],},
-      md:{type:"integer"},
-    // project는 nullable (card.projectId가 null일 수 있으니까)
-    project: projectShape,
+    cardId: {
+      type: "string",
+    },
+
+    boardId: {
+      type: "string",
+    },
+
+    columnId: {
+      type: "string",
+    },
+
+    // 추가
+    parentCardId: {
+      type: [
+        "string",
+        "null",
+      ],
+    },
+
+    title: {
+      type: "string",
+    },
+
+    content: {
+      type: [
+        "string",
+        "null",
+      ],
+    },
+
+    order: {
+      type: "integer",
+    },
+
+    createdAt: {
+      type: "string",
+    },
+
+    updatedAt: {
+      type: "string",
+    },
+
+    contentUpdateAt: {
+      type: "string",
+    },
+
+    createdBy:
+      createdByShape,
+
+    startDate: {
+      type: [
+        "string",
+        "null",
+      ],
+    },
+
+    dueDate: {
+      type: [
+        "string",
+        "null",
+      ],
+    },
+
+    md: {
+      type: "integer",
+    },
+
+    project:
+      projectShape,
   },
 };
 
@@ -169,6 +227,7 @@ export const getBoardDetailSchema = {
     required: ["boardId"],
     properties: {
       boardId: { type: "string" },
+      startDate:{type:"string",format:"date"}
     },
   },
   response: {
@@ -181,7 +240,6 @@ export const getBoardDetailSchema = {
           type: "array",
           items: columnShape,
         },
-
         // cardsById: Record<string, Card>
         cardsById: {
           type: "object",

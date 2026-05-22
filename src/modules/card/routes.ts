@@ -30,88 +30,259 @@ function calcOrderForInsert(
 
 
 const cardRoutes: FastifyPluginAsync = async (app) => {
-  app.post(
-    "/card",
-    { preHandler: [requireAuth], schema: createCardSchema },
-    async (req: any, reply) => {
-      const userId = req.user.sub as string;
-      const requestId = req.headers["x-request-id"]
-        ? String(req.headers["x-request-id"])
-        : null;
+app.post(
+  "/card",
+  { preHandler: [requireAuth], schema: createCardSchema },
+  async (req: any, reply) => {
+    const userId = req.user.sub as string;
 
-      const body = req.body as {
-        columnId: string;
-        title: string;
-        content?: string;
-        projectId?: string;
-        dueDate?: string;
-        md?: number;
-      };
+    const requestId = req.headers["x-request-id"]
+      ? String(req.headers["x-request-id"])
+      : null;
 
-      const columnId = String(body.columnId ?? "").trim();
-      const title = String(body.title ?? "").trim();
-      const content = String(body.content ?? "").trim();
-      const projectId = String(body.projectId ?? "").trim() || null;
-      const md = body.md ?? 0;
+    const body = req.body as {
+      columnId: string;
+      title: string;
+      content?: string | null;
+      projectId?: string | null;
+      dueDate?: string | null;
+      startDate?: string | null;
+      parentCardId?: string | null;
+      assigneeUserId?: string | null;
+      progress?: number;
+      md?: number;
+    };
 
-      if (md < 0) {
-        return reply.status(400).send({ code: "INVALID_MD", message: "invalid md period" });
-      }
+    const columnId = String(body.columnId ?? "").trim();
+    const title = String(body.title ?? "").trim();
+    const content = String(body.content ?? "").trim();
 
-      const dueDate = parseIsoDateOrNull(body.dueDate);
-      if (body.dueDate && !dueDate) {
-        return reply.status(400).send({ code: "INVALID_DUEDATE", message: "invalid dueDate" });
-      }
+    const projectId =
+      String(body.projectId ?? "").trim() || null;
 
-      const column = await app.prisma.column.findUnique({
+    const parentCardId =
+      String(body.parentCardId ?? "").trim() || null;
+
+    const assigneeUserId =
+      String(body.assigneeUserId ?? "").trim() || null;
+
+    const md =
+      Number(body.md ?? 0);
+
+    const progress =
+      Number(body.progress ?? 0);
+
+    if (!columnId) {
+      return reply.status(400).send({
+        code: "COLUMN_REQUIRED",
+        message: "columnId required",
+      });
+    }
+
+    if (!title) {
+      return reply.status(400).send({
+        code: "TITLE_REQUIRED",
+        message: "title required",
+      });
+    }
+
+    if (!Number.isInteger(md) || md < 0) {
+      return reply.status(400).send({
+        code: "INVALID_MD",
+        message: "invalid md period",
+      });
+    }
+
+    if (
+      !Number.isInteger(progress) ||
+      progress < 0 ||
+      progress > 100
+    ) {
+      return reply.status(400).send({
+        code: "INVALID_PROGRESS",
+        message: "progress must be 0~100",
+      });
+    }
+
+    const startDate =
+      parseIsoDateOrNull(body.startDate);
+
+    if (body.startDate && !startDate) {
+      return reply.status(400).send({
+        code: "INVALID_STARTDATE",
+        message: "invalid startDate",
+      });
+    }
+
+    const dueDate =
+      parseIsoDateOrNull(body.dueDate);
+
+    if (body.dueDate && !dueDate) {
+      return reply.status(400).send({
+        code: "INVALID_DUEDATE",
+        message: "invalid dueDate",
+      });
+    }
+
+    const column =
+      await app.prisma.column.findUnique({
         where: { columnId },
-        select: { columnId: true, boardId: true },
+        select: {
+          columnId: true,
+          boardId: true,
+        },
       });
-      if (!column) {
-        return reply.status(404).send({ code: "COLUMN_NOT_FOUND", message: "column not found" });
-      }
 
-      const auth = await assertTeamMemberByBoard(app, userId, column.boardId);
-      if (!auth.ok) {
-        return reply.status(auth.status).send({ code: auth.code, message: auth.message });
-      }
-
-      const board = await app.prisma.board.findUnique({
-        where: { boardId: column.boardId },
-        select: { teamId: true },
+    if (!column) {
+      return reply.status(404).send({
+        code: "COLUMN_NOT_FOUND",
+        message: "column not found",
       });
-      if (!board) {
-        return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
-      }
+    }
 
-      if (projectId) {
-        const project = await app.prisma.project.findUnique({
-          where: { projectId },
-          select: { teamId: true },
+    const auth =
+      await assertTeamMemberByBoard(
+        app,
+        userId,
+        column.boardId
+      );
+
+    if (!auth.ok) {
+      return reply.status(auth.status).send({
+        code: auth.code,
+        message: auth.message,
+      });
+    }
+
+    const board =
+      await app.prisma.board.findUnique({
+        where: {
+          boardId: column.boardId,
+        },
+        select: {
+          teamId: true,
+        },
+      });
+
+    if (!board) {
+      return reply.status(404).send({
+        code: "BOARD_NOT_FOUND",
+        message: "board not found",
+      });
+    }
+
+    let finalProjectId =
+      projectId;
+
+    if (parentCardId) {
+      const parentCard =
+        await app.prisma.card.findUnique({
+          where: { cardId: parentCardId },
+          select: {
+            cardId: true,
+            boardId: true,
+            projectId: true,
+          },
         });
-        if (!project) {
-          return reply.status(404).send({ code: "PROJECT_NOT_FOUND", message: "project not found" });
-        }
-        if (project.teamId !== board.teamId) {
-          return reply.status(400).send({ code: "INVALID_PROJECT", message: "project is not in the same team" });
-        }
+
+      if (!parentCard) {
+        return reply.status(404).send({
+          code: "PARENT_CARD_NOT_FOUND",
+          message: "parent card not found",
+        });
       }
 
-      const first = await app.prisma.card.findFirst({
-        where: { columnId },
-        select: { order: true },
-        orderBy: { order: "asc" },
-      });
-      const nextOrder = first ? first.order - 1 : -1;
+      if (parentCard.boardId !== column.boardId) {
+        return reply.status(400).send({
+          code: "INVALID_PARENT_CARD",
+          message: "parent card is not in the same board",
+        });
+      }
 
-      const card = await app.prisma.card.create({
+      if (!finalProjectId) {
+        finalProjectId =
+          parentCard.projectId;
+      }
+    }
+
+    if (finalProjectId) {
+      const project =
+        await app.prisma.project.findUnique({
+          where: {
+            projectId: finalProjectId,
+          },
+          select: {
+            teamId: true,
+          },
+        });
+
+      if (!project) {
+        return reply.status(404).send({
+          code: "PROJECT_NOT_FOUND",
+          message: "project not found",
+        });
+      }
+
+      if (project.teamId !== board.teamId) {
+        return reply.status(400).send({
+          code: "INVALID_PROJECT",
+          message: "project is not in the same team",
+        });
+      }
+    }
+
+    if (assigneeUserId) {
+      const assignee =
+        await app.prisma.teamMember.findFirst({
+          where: {
+            teamId: board.teamId,
+            userId: assigneeUserId,
+          },
+          select: {
+            userId: true,
+          },
+        });
+
+      if (!assignee) {
+        return reply.status(400).send({
+          code: "INVALID_ASSIGNEE",
+          message: "assignee is not in the same team",
+        });
+      }
+    }
+
+    const first =
+      await app.prisma.card.findFirst({
+        where: {
+          columnId,
+        },
+        select: {
+          order: true,
+        },
+        orderBy: {
+          order: "asc",
+        },
+      });
+
+    const nextOrder =
+      first ? first.order - 1 : -1;
+
+    const card =
+      await app.prisma.card.create({
         data: {
           boardId: column.boardId,
           columnId,
           title,
-          content: content.length > 0 ? content : null,
-          projectId,
+          content:
+            content.length > 0
+              ? content
+              : null,
+          projectId: finalProjectId,
+          parentCardId,
+          assigneeUserId,
+          startDate,
           dueDate,
+          progress,
           order: nextOrder,
           createdByUserId: userId,
           md,
@@ -120,16 +291,39 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
           cardId: true,
           boardId: true,
           columnId: true,
+          projectId: true,
+          parentCardId: true,
+          assigneeUserId: true,
+
           title: true,
           content: true,
-          order: true,
-          projectId: true,
+          startDate: true,
           dueDate: true,
+          progress: true,
+          order: true,
+          md: true,
+
           createdAt: true,
           updatedAt: true,
-          md: true,
+          contentUpdateAt: true,
           createdByUserId: true,
-          createdBy: { select: { userId: true, id: true, name: true } },
+
+          createdBy: {
+            select: {
+              userId: true,
+              id: true,
+              name: true,
+            },
+          },
+
+          assignee: {
+            select: {
+              userId: true,
+              id: true,
+              name: true,
+            },
+          },
+
           project: {
             select: {
               projectId: true,
@@ -145,37 +339,68 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
         },
       });
 
-      const payloadCard = {
-        ...card,
-        createdBy: card.createdBy ?? null,
-        project: card.project
-          ? {
-              ...card.project,
-              price: card.project.price.toString(),
-              startDate: card.project.startDate ? iso(card.project.startDate) : "",
-              endDate: card.project.endDate ? iso(card.project.endDate) : "",
-            }
+    const payloadCard = {
+      ...card,
+
+      createdBy:
+        card.createdBy ?? null,
+
+      assignee:
+        card.assignee ?? null,
+
+      project: card.project
+        ? {
+            ...card.project,
+            price:
+              card.project.price.toString(),
+            startDate:
+              card.project.startDate
+                ? iso(card.project.startDate)
+                : "",
+            endDate:
+              card.project.endDate
+                ? iso(card.project.endDate)
+                : "",
+          }
+        : null,
+
+      startDate:
+        card.startDate
+          ? iso(card.startDate)
           : null,
-        dueDate: card.dueDate ? iso(card.dueDate) : null,
-        createdAt: iso(card.createdAt),
-        updatedAt: iso(card.updatedAt),
-        order:nextOrder,
-      };
 
-      app.io.to(`board:${card.boardId}`).emit("board:event", {
-        type: "card:created",
-        boardId: card.boardId,
-        card: payloadCard,
-        actorUserId: userId,
-        requestId,
-        updatedAt: new Date().toISOString(),
-      });
+      dueDate:
+        card.dueDate
+          ? iso(card.dueDate)
+          : null,
 
-      return reply.code(201).send({
-        card: payloadCard,
-      });
-    }
-  );
+      createdAt:
+        iso(card.createdAt),
+
+      updatedAt:
+        iso(card.updatedAt),
+
+      contentUpdateAt:
+        iso(card.contentUpdateAt),
+
+      order:
+        nextOrder,
+    };
+
+    app.io.to(`board:${card.boardId}`).emit("board:event", {
+      type: "card:created",
+      boardId: card.boardId,
+      card: payloadCard,
+      actorUserId: userId,
+      requestId,
+      updatedAt: new Date().toISOString(),
+    });
+
+    return reply.code(201).send({
+      card: payloadCard,
+    });
+  }
+);
 
   //requireMyCard(app, (req: any) => req.params.cardId) 
   app.patch(
@@ -296,40 +521,56 @@ if (shouldUpdateContentAt) {
       const card = await app.prisma.card.update({
         where: { cardId },
         data,
-        select: {
-          cardId: true,
-          boardId: true,
-          columnId: true,
-          title: true,
-          content: true,
-          dueDate: true,
-          order: true,
-          createdAt: true,
-          updatedAt: true,
-          contentUpdateAt: true,
-          md: true,
-          projectId: true,
-          createdByUserId: true,
-          createdBy: {
-            select: {
-              userId: true,
-              id: true,
-              name: true,
-            },
-          },
-          project: {
-            select: {
-              projectId: true,
-              teamId: true,
-              code: true,
-              name: true,
-              price: true,
-              startDate: true,
-              endDate: true,
-              colorCode: true,
-            },
-          },
-        },
+     select: {
+  cardId: true,
+  boardId: true,
+  columnId: true,
+  projectId: true,
+  parentCardId: true,
+  assigneeUserId: true,
+
+  title: true,
+  content: true,
+  startDate: true,
+  dueDate: true,
+  progress: true,
+  order: true,
+  md: true,
+
+  createdAt: true,
+  updatedAt: true,
+  contentUpdateAt: true,
+  createdByUserId: true,
+
+  createdBy: {
+    select: {
+      userId: true,
+      id: true,
+      name: true,
+    },
+  },
+
+  assignee: {
+    select: {
+      userId: true,
+      id: true,
+      name: true,
+    },
+  },
+
+  project: {
+    select: {
+      projectId: true,
+      teamId: true,
+      code: true,
+      name: true,
+      price: true,
+      startDate: true,
+      endDate: true,
+      colorCode: true,
+    },
+  },
+},
       });
 
       const payloadCard = {
@@ -410,7 +651,7 @@ await app.prisma.$transaction(async (tx: any) => {
     }
   );
 
-app.patch(
+app.patch( 
   "/card/:cardId/move",
   { preHandler: [requireAuth], schema: moveCardSchema },
   async (req: any, reply) => {
