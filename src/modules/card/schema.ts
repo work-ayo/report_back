@@ -1,6 +1,5 @@
-import { describe } from "zod/v4/core";
 import { commonErrorResponses } from "../../common/commonResponse.js";
-import {iso} from "../../common/utils.js";
+
 const userMiniShape = {
   type: "object",
   additionalProperties: false,
@@ -9,22 +8,125 @@ const userMiniShape = {
     userId: { type: "string" },
     id: { type: "string" },
     name: { type: "string" },
+    email: { type: ["string", "null"] },
   },
 };
 
 const projectMiniShape = {
   type: "object",
   additionalProperties: false,
-  required: ["projectId", "teamId", "code", "name", "price", "startDate", "endDate"],
+  required: [
+    "projectId",
+    "teamId",
+    "code",
+    "name",
+    "price",
+    "startDate",
+    "endDate",
+  ],
   properties: {
     projectId: { type: "string" },
     teamId: { type: "string" },
     code: { type: "string" },
     name: { type: "string" },
     price: { type: "string", pattern: "^[0-9]+$" },
-    startDate: { type: "string" },
-    endDate: { type: "string" },
-    colorCode:{type:"string"}
+    startDate: { type: ["string", "null"] },
+    endDate: { type: ["string", "null"] },
+    colorCode: { type: "string" },
+  },
+};
+
+const parentMiniShape = {
+  type: "object",
+  additionalProperties: false,
+  required: ["cardId", "title"],
+  properties: {
+    cardId: { type: "string" },
+    title: { type: "string" },
+  },
+};
+
+const cardShape = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "cardId",
+    "boardId",
+    "columnId",
+    "title",
+    "content",
+    "order",
+    "createdByUserId",
+    "createdBy",
+    "projectId",
+    "project",
+    "parentCardId",
+    "parent",
+    "assigneeUserId",
+    "assignee",
+    "startDate",
+    "dueDate",
+    "progress",
+    "createdAt",
+    "updatedAt",
+    "contentUpdateAt",
+    "md",
+  ],
+  properties: {
+    cardId: { type: "string" },
+    boardId: { type: "string" },
+    columnId: { type: "string" },
+
+    title: { type: "string" },
+    content: { type: ["string", "null"] },
+    order: { type: "integer" },
+
+    projectId: { type: ["string", "null"] },
+    project: {
+      anyOf: [projectMiniShape, { type: "null" }],
+    },
+
+    parentCardId: {
+      type: ["string", "null"],
+    },
+
+    parent: {
+      anyOf: [parentMiniShape, { type: "null" }],
+    },
+
+    assigneeUserId: {
+      type: ["string", "null"],
+    },
+
+    assignee: {
+      anyOf: [userMiniShape, { type: "null" }],
+    },
+
+    startDate: {
+      type: ["string", "null"],
+    },
+
+    dueDate: {
+      type: ["string", "null"],
+    },
+
+    progress: {
+      type: "integer",
+      minimum: 0,
+      maximum: 100,
+    },
+
+    createdByUserId: { type: "string" },
+
+    createdBy: {
+      anyOf: [userMiniShape, { type: "null" }],
+    },
+
+    createdAt: { type: "string" },
+    updatedAt: { type: "string" },
+    contentUpdateAt: { type: "string" },
+
+    md: { type: "integer" },
   },
 };
 
@@ -46,7 +148,7 @@ export const createCardSchema = {
       title: {
         type: "string",
         minLength: 1,
-        maxLength: 120,
+        maxLength: 200,
         default: "",
       },
 
@@ -73,11 +175,13 @@ export const createCardSchema = {
       startDate: {
         type: ["string", "null"],
         default: "",
+        description: "YYYY-MM-DD",
       },
 
       dueDate: {
         type: ["string", "null"],
         default: "",
+        description: "YYYY-MM-DD",
       },
 
       progress: {
@@ -90,6 +194,7 @@ export const createCardSchema = {
       md: {
         type: "integer",
         minimum: 0,
+        default: 0,
       },
     },
   },
@@ -100,81 +205,7 @@ export const createCardSchema = {
       additionalProperties: false,
       required: ["card"],
       properties: {
-        card: {
-          type: "object",
-          additionalProperties: false,
-          required: [
-            "cardId",
-            "boardId",
-            "columnId",
-            "title",
-            "content",
-            "order",
-            "createdByUserId",
-            "createdBy",
-            "projectId",
-            "project",
-            "parentCardId",
-            "assigneeUserId",
-            "assignee",
-            "startDate",
-            "dueDate",
-            "progress",
-            "createdAt",
-            "updatedAt",
-            "contentUpdateAt",
-            "md",
-          ],
-          properties: {
-            cardId: { type: "string" },
-            boardId: { type: "string" },
-            columnId: { type: "string" },
-
-            title: { type: "string" },
-            content: { type: ["string", "null"] },
-            order: { type: "integer" },
-
-            projectId: { type: ["string", "null"] },
-            project: {
-              anyOf: [projectMiniShape, { type: "null" }],
-            },
-
-            parentCardId: {
-              type: ["string", "null"],
-            },
-
-            assigneeUserId: {
-              type: ["string", "null"],
-            },
-
-            assignee: {
-              anyOf: [userMiniShape, { type: "null" }],
-            },
-
-            startDate: {
-              type: ["string", "null"],
-            },
-
-            dueDate: {
-              type: ["string", "null"],
-            },
-
-            progress: {
-              type: "integer",
-            },
-
-            createdByUserId: { type: "string" },
-            createdBy: {
-              anyOf: [userMiniShape, { type: "null" }],
-            },
-
-            createdAt: { type: "string" },
-            updatedAt: { type: "string" },
-            contentUpdateAt: { type: "string" },
-
-            md: { type: "integer" },
-          },
-        },
+        card: cardShape,
       },
     },
     ...commonErrorResponses,
@@ -191,7 +222,10 @@ export const updateCardSchema = {
     additionalProperties: false,
     required: ["cardId"],
     properties: {
-      cardId: { type: "string", minLength: 1 },
+      cardId: {
+        type: "string",
+        minLength: 1,
+      },
     },
   },
 
@@ -199,11 +233,48 @@ export const updateCardSchema = {
     type: "object",
     additionalProperties: false,
     properties: {
-      title: { type: "string", minLength: 1, maxLength: 120, default: "" },
-      content: { type: "string", default: "" },
-      dueDate: { type: "string", default: "", description: "YYYY-MM-DD" },
-       md:{type:"integer"},
-      projectId: { type: "string", default: "" }, // ""이면 null로 처리하는 로직이면 OK
+      title: {
+        type: "string",
+        minLength: 1,
+        maxLength: 200,
+      },
+
+      content: {
+        type: ["string", "null"],
+      },
+
+      projectId: {
+        type: ["string", "null"],
+      },
+
+      parentCardId: {
+        type: ["string", "null"],
+      },
+
+      assigneeUserId: {
+        type: ["string", "null"],
+      },
+
+      startDate: {
+        type: ["string", "null"],
+        description: "YYYY-MM-DD",
+      },
+
+      dueDate: {
+        type: ["string", "null"],
+        description: "YYYY-MM-DD",
+      },
+
+      progress: {
+        type: "integer",
+        minimum: 0,
+        maximum: 100,
+      },
+
+      md: {
+        type: "integer",
+        minimum: 0,
+      },
     },
   },
 
@@ -213,43 +284,7 @@ export const updateCardSchema = {
       additionalProperties: false,
       required: ["card"],
       properties: {
-        card: {
-          type: "object",
-          additionalProperties: false,
-          required: ["cardId", "boardId", "columnId", "title", "order", "createdByUserId", "createdAt", "updatedAt"],
-          properties: {
-            cardId: { type: "string" },
-            boardId: { type: "string" },
-            columnId: { type: "string" },
-            title: { type: "string" },
-            content: { type: ["string", "null"] },
-
-           
-            dueDate: { type: "string" },
-
-            projectId: { type: ["string", "null"] },
-
-            project: {
-              type: ["object", "null"],
-              additionalProperties: false,
-              required: ["projectId", "name", "price"],
-              properties: {
-                projectId: { type: "string" },
-                name: { type: "string" },
-                colorCode:{type:"string"},
-                // BigInt는 JSON 불가 -> string digits로 내려야 안전
-                price: { type: "string", pattern: "^[0-9]+$" },
-              },
-            },
-
-            order: { type: "integer" },
-            createdByUserId: { type: "string" },
-            createdAt: { type: "string" },
-            updatedAt: { type: "string" },
-            contentUpdateAt: { type: "string" },
-             md:{type:"integer"}
-          },
-        },
+        card: cardShape,
       },
     },
     ...commonErrorResponses,
@@ -262,6 +297,7 @@ export const deleteCardSchema = {
   security: [{ bearerAuth: [] }],
   params: {
     type: "object",
+    additionalProperties: false,
     required: ["cardId"],
     properties: {
       cardId: { type: "string" },
@@ -270,21 +306,24 @@ export const deleteCardSchema = {
   response: {
     200: {
       type: "object",
+      additionalProperties: false,
       required: ["ok"],
-      properties: { ok: { type: "boolean" } },
+      properties: {
+        ok: { type: "boolean" },
+      },
     },
-     ...commonErrorResponses
+    ...commonErrorResponses,
   },
 };
 
 export const moveCardSchema = {
   tags: ["card"],
   summary: "카드 이동/정렬",
-  consumes: ["application/x-www-form-urlencoded"],
   security: [{ bearerAuth: [] }],
 
   params: {
     type: "object",
+    additionalProperties: false,
     required: ["cardId"],
     properties: {
       cardId: { type: "string" },
@@ -304,18 +343,26 @@ export const moveCardSchema = {
   response: {
     200: {
       type: "object",
+      additionalProperties: false,
       required: ["ok", "card"],
       properties: {
         ok: { type: "boolean" },
         card: {
           type: "object",
-          required: ["cardId", "boardId", "columnId", "order", "updatedAt"],
+          additionalProperties: false,
+          required: [
+            "cardId",
+            "boardId",
+            "columnId",
+            "order",
+            "updatedAt",
+          ],
           properties: {
             cardId: { type: "string" },
             boardId: { type: "string" },
             columnId: { type: "string" },
             order: { type: "number" },
-            updatedAt: { type: "string", format: "string" },
+            updatedAt: { type: "string" },
           },
         },
       },

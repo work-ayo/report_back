@@ -1,17 +1,164 @@
 import type { FastifyPluginAsync } from "fastify";
-import { requireAuth, assertTeamMemberByBoard, requireMyCard } from "../../common/middleware/auth.js";
-import { createCardSchema, updateCardSchema, deleteCardSchema, moveCardSchema } from "./schema.js";
 
-function iso(d: Date) {
-  return d.toISOString();
+import {
+  requireAuth,
+  assertTeamMemberByBoard,
+  requireMyCard,
+} from "../../common/middleware/auth.js";
+
+import {
+  createCardSchema,
+  updateCardSchema,
+  deleteCardSchema,
+  moveCardSchema,
+} from "./schema.js";
+
+function iso(d: Date | null | undefined) {
+  return d ? d.toISOString() : null;
 }
 
-function parseIsoDateOrNull(v: unknown): Date | null {
+function dateOnly(d: Date | null | undefined) {
+  return d ? d.toISOString().slice(0, 10) : null;
+}
+
+function parseDateOrNull(v: unknown): Date | null {
   const s = typeof v === "string" ? v.trim() : "";
+
   if (!s) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(`${s}T00:00:00.000Z`);
+
+    if (Number.isNaN(d.getTime())) return null;
+
+    return d;
+  }
+
   const d = new Date(s);
+
   if (Number.isNaN(d.getTime())) return null;
+
   return d;
+}
+
+function sanitizeNullableString(v: unknown) {
+  const s = typeof v === "string" ? v.trim() : "";
+
+  return s || null;
+}
+
+function sanitizeProgress(v: unknown) {
+  const n = Number(v ?? 0);
+
+  if (!Number.isInteger(n)) return 0;
+
+  return Math.min(100, Math.max(0, n));
+}
+
+function sanitizeMd(v: unknown) {
+  const n = Number(v ?? 0);
+
+  if (!Number.isInteger(n) || n < 0) return 0;
+
+  return n;
+}
+
+function toProjectJson(project: any) {
+  if (!project) return null;
+
+  return {
+    projectId: project.projectId,
+    teamId: project.teamId,
+    code: project.code,
+    name: project.name,
+    price: String(project.price ?? 0),
+    startDate: dateOnly(project.startDate),
+    endDate: dateOnly(project.endDate),
+    colorCode: project.colorCode,
+  };
+}
+
+function toUserMiniJson(user: any) {
+  if (!user) return null;
+
+  return {
+    userId: user.userId,
+    id: user.id,
+    name: user.name,
+    email: user.email ?? null,
+  };
+}
+
+function toParentJson(parent: any) {
+  if (!parent) return null;
+
+  return {
+    cardId: parent.cardId,
+    title: parent.title,
+  };
+}
+
+function toCardJson(card: any) {
+  return {
+    cardId: card.cardId,
+    boardId: card.boardId,
+    columnId: card.columnId,
+
+    title: card.title,
+    content: card.content ?? null,
+    order: card.order,
+
+    projectId: card.projectId ?? null,
+    project: toProjectJson(card.project),
+
+    parentCardId: card.parentCardId ?? null,
+    parent: toParentJson(card.parent),
+
+    assigneeUserId: card.assigneeUserId ?? null,
+    assignee: toUserMiniJson(card.assignee),
+
+    startDate: dateOnly(card.startDate),
+    dueDate: dateOnly(card.dueDate),
+    progress: Number(card.progress ?? 0),
+
+    createdByUserId: card.createdByUserId,
+    createdBy: toUserMiniJson(card.createdBy),
+
+    createdAt: iso(card.createdAt),
+    updatedAt: iso(card.updatedAt),
+    contentUpdateAt: iso(card.contentUpdateAt),
+
+    md: Number(card.md ?? 0),
+  };
+}
+
+function cardInclude() {
+  return {
+    project: true,
+
+    assignee: {
+      select: {
+        userId: true,
+        id: true,
+        name: true,
+      },
+    },
+
+    parent: {
+      select: {
+        cardId: true,
+        title: true,
+      },
+    },
+
+    createdBy: {
+      select: {
+        userId: true,
+        id: true,
+        name: true,
+      },
+    },
+  };
 }
 
 function calcOrderForInsert(
@@ -23,109 +170,83 @@ function calcOrderForInsert(
   if (nextOrder === null) return prevOrder + 1024;
 
   const gap = nextOrder - prevOrder;
+
   if (gap <= 1) return null;
 
   return Math.floor((prevOrder + nextOrder) / 2);
 }
 
-
 const cardRoutes: FastifyPluginAsync = async (app) => {
-app.post(
-  "/card",
-  { preHandler: [requireAuth], schema: createCardSchema },
-  async (req: any, reply) => {
-    const userId = req.user.sub as string;
+  app.post(
+    "/card",
+    {
+      preHandler: [requireAuth],
+      schema: createCardSchema,
+    },
+    async (req: any, reply) => {
+      const userId = req.user.sub as string;
 
-    const requestId = req.headers["x-request-id"]
-      ? String(req.headers["x-request-id"])
-      : null;
+      const body = req.body as {
+        columnId: string;
+        title: string;
+        content?: string | null;
+        projectId?: string | null;
+        dueDate?: string | null;
+        startDate?: string | null;
+        parentCardId?: string | null;
+        assigneeUserId?: string | null;
+        progress?: number;
+        md?: number;
+      };
 
-    const body = req.body as {
-      columnId: string;
-      title: string;
-      content?: string | null;
-      projectId?: string | null;
-      dueDate?: string | null;
-      startDate?: string | null;
-      parentCardId?: string | null;
-      assigneeUserId?: string | null;
-      progress?: number;
-      md?: number;
-    };
+      const columnId = String(body.columnId ?? "").trim();
+      const title = String(body.title ?? "").trim();
+      const content = sanitizeNullableString(body.content);
+      const projectId = sanitizeNullableString(body.projectId);
+      const parentCardId = sanitizeNullableString(body.parentCardId);
+      const assigneeUserId = sanitizeNullableString(body.assigneeUserId);
+      const md = sanitizeMd(body.md);
+      const progress = sanitizeProgress(body.progress ?? body.md ?? 0);
 
-    const columnId = String(body.columnId ?? "").trim();
-    const title = String(body.title ?? "").trim();
-    const content = String(body.content ?? "").trim();
+      if (!columnId) {
+        return reply.status(400).send({
+          code: "COLUMN_REQUIRED",
+          message: "columnId required",
+        });
+      }
 
-    const projectId =
-      String(body.projectId ?? "").trim() || null;
+      if (!title) {
+        return reply.status(400).send({
+          code: "TITLE_REQUIRED",
+          message: "title required",
+        });
+      }
 
-    const parentCardId =
-      String(body.parentCardId ?? "").trim() || null;
+      const startDate = parseDateOrNull(body.startDate);
+      const dueDate = parseDateOrNull(body.dueDate);
 
-    const assigneeUserId =
-      String(body.assigneeUserId ?? "").trim() || null;
+      if (body.startDate && !startDate) {
+        return reply.status(400).send({
+          code: "INVALID_STARTDATE",
+          message: "invalid startDate",
+        });
+      }
 
-    const md =
-      Number(body.md ?? 0);
+      if (body.dueDate && !dueDate) {
+        return reply.status(400).send({
+          code: "INVALID_DUEDATE",
+          message: "invalid dueDate",
+        });
+      }
 
-    const progress =
-      Number(body.progress ?? 0);
+      if (startDate && dueDate && dueDate.getTime() < startDate.getTime()) {
+        return reply.status(400).send({
+          code: "INVALID_DATE_RANGE",
+          message: "dueDate must be greater than or equal to startDate",
+        });
+      }
 
-    if (!columnId) {
-      return reply.status(400).send({
-        code: "COLUMN_REQUIRED",
-        message: "columnId required",
-      });
-    }
-
-    if (!title) {
-      return reply.status(400).send({
-        code: "TITLE_REQUIRED",
-        message: "title required",
-      });
-    }
-
-    if (!Number.isInteger(md) || md < 0) {
-      return reply.status(400).send({
-        code: "INVALID_MD",
-        message: "invalid md period",
-      });
-    }
-
-    if (
-      !Number.isInteger(progress) ||
-      progress < 0 ||
-      progress > 100
-    ) {
-      return reply.status(400).send({
-        code: "INVALID_PROGRESS",
-        message: "progress must be 0~100",
-      });
-    }
-
-    const startDate =
-      parseIsoDateOrNull(body.startDate);
-
-    if (body.startDate && !startDate) {
-      return reply.status(400).send({
-        code: "INVALID_STARTDATE",
-        message: "invalid startDate",
-      });
-    }
-
-    const dueDate =
-      parseIsoDateOrNull(body.dueDate);
-
-    if (body.dueDate && !dueDate) {
-      return reply.status(400).send({
-        code: "INVALID_DUEDATE",
-        message: "invalid dueDate",
-      });
-    }
-
-    const column =
-      await app.prisma.column.findUnique({
+      const column = await app.prisma.column.findUnique({
         where: { columnId },
         select: {
           columnId: true,
@@ -133,682 +254,552 @@ app.post(
         },
       });
 
-    if (!column) {
-      return reply.status(404).send({
-        code: "COLUMN_NOT_FOUND",
-        message: "column not found",
-      });
-    }
+      if (!column) {
+        return reply.status(404).send({
+          code: "COLUMN_NOT_FOUND",
+          message: "column not found",
+        });
+      }
 
-    const auth =
-      await assertTeamMemberByBoard(
+      const auth = await assertTeamMemberByBoard(
         app,
         userId,
         column.boardId
       );
 
-    if (!auth.ok) {
-      return reply.status(auth.status).send({
-        code: auth.code,
-        message: auth.message,
-      });
-    }
+      if (!auth.ok) {
+        return reply.status(auth.status).send({
+          code: auth.code,
+          message: auth.message,
+        });
+      }
 
-    const board =
-      await app.prisma.board.findUnique({
+      const board = await app.prisma.board.findUnique({
         where: {
           boardId: column.boardId,
         },
         select: {
+          boardId: true,
           teamId: true,
         },
       });
 
-    if (!board) {
-      return reply.status(404).send({
-        code: "BOARD_NOT_FOUND",
-        message: "board not found",
-      });
-    }
+      if (!board) {
+        return reply.status(404).send({
+          code: "BOARD_NOT_FOUND",
+          message: "board not found",
+        });
+      }
 
-    let finalProjectId =
-      projectId;
-
-    if (parentCardId) {
-      const parentCard =
-        await app.prisma.card.findUnique({
-          where: { cardId: parentCardId },
+      if (projectId) {
+        const project = await app.prisma.project.findFirst({
+          where: {
+            projectId,
+            teamId: board.teamId,
+          },
           select: {
-            cardId: true,
-            boardId: true,
             projectId: true,
           },
         });
 
-      if (!parentCard) {
-        return reply.status(404).send({
-          code: "PARENT_CARD_NOT_FOUND",
-          message: "parent card not found",
-        });
+        if (!project) {
+          return reply.status(400).send({
+            code: "INVALID_PROJECT",
+            message: "project not found in this team",
+          });
+        }
       }
 
-      if (parentCard.boardId !== column.boardId) {
-        return reply.status(400).send({
-          code: "INVALID_PARENT_CARD",
-          message: "parent card is not in the same board",
-        });
-      }
-
-      if (!finalProjectId) {
-        finalProjectId =
-          parentCard.projectId;
-      }
-    }
-
-    if (finalProjectId) {
-      const project =
-        await app.prisma.project.findUnique({
+      if (assigneeUserId) {
+        const assignee = await app.prisma.teamMember.findUnique({
           where: {
-            projectId: finalProjectId,
-          },
-          select: {
-            teamId: true,
-          },
-        });
-
-      if (!project) {
-        return reply.status(404).send({
-          code: "PROJECT_NOT_FOUND",
-          message: "project not found",
-        });
-      }
-
-      if (project.teamId !== board.teamId) {
-        return reply.status(400).send({
-          code: "INVALID_PROJECT",
-          message: "project is not in the same team",
-        });
-      }
-    }
-
-    if (assigneeUserId) {
-      const assignee =
-        await app.prisma.teamMember.findFirst({
-          where: {
-            teamId: board.teamId,
-            userId: assigneeUserId,
+            teamId_userId: {
+              teamId: board.teamId,
+              userId: assigneeUserId,
+            },
           },
           select: {
             userId: true,
           },
         });
 
-      if (!assignee) {
-        return reply.status(400).send({
-          code: "INVALID_ASSIGNEE",
-          message: "assignee is not in the same team",
-        });
+        if (!assignee) {
+          return reply.status(400).send({
+            code: "INVALID_ASSIGNEE",
+            message: "assignee is not a member of this team",
+          });
+        }
       }
-    }
 
-    const first =
-      await app.prisma.card.findFirst({
-        where: {
-          columnId,
-        },
-        select: {
-          order: true,
-        },
-        orderBy: {
-          order: "asc",
-        },
+      if (parentCardId) {
+        const parent = await app.prisma.card.findFirst({
+          where: {
+            cardId: parentCardId,
+            boardId: board.boardId,
+          },
+          select: {
+            cardId: true,
+          },
+        });
+
+        if (!parent) {
+          return reply.status(400).send({
+            code: "INVALID_PARENT_CARD",
+            message: "parent card not found in this board",
+          });
+        }
+      }
+
+      const last = await app.prisma.card.findFirst({
+        where: { columnId },
+        orderBy: { order: "desc" },
+        select: { order: true },
       });
 
-    const nextOrder =
-      first ? first.order - 1 : -1;
+      const order = last ? last.order + 1024 : 0;
 
-    const card =
-      await app.prisma.card.create({
+      const created = await app.prisma.card.create({
         data: {
-          boardId: column.boardId,
+          boardId: board.boardId,
           columnId,
+
           title,
-          content:
-            content.length > 0
-              ? content
-              : null,
-          projectId: finalProjectId,
+          content,
+
+          projectId,
           parentCardId,
           assigneeUserId,
+
           startDate,
           dueDate,
+
           progress,
-          order: nextOrder,
-          createdByUserId: userId,
           md,
+
+          order,
+          createdByUserId: userId,
         },
-        select: {
-          cardId: true,
-          boardId: true,
-          columnId: true,
-          projectId: true,
-          parentCardId: true,
-          assigneeUserId: true,
-
-          title: true,
-          content: true,
-          startDate: true,
-          dueDate: true,
-          progress: true,
-          order: true,
-          md: true,
-
-          createdAt: true,
-          updatedAt: true,
-          contentUpdateAt: true,
-          createdByUserId: true,
-
-          createdBy: {
-            select: {
-              userId: true,
-              id: true,
-              name: true,
-            },
-          },
-
-          assignee: {
-            select: {
-              userId: true,
-              id: true,
-              name: true,
-            },
-          },
-
-          project: {
-            select: {
-              projectId: true,
-              teamId: true,
-              code: true,
-              name: true,
-              price: true,
-              startDate: true,
-              endDate: true,
-              colorCode: true,
-            },
-          },
-        },
+        include: cardInclude(),
       });
 
-    const payloadCard = {
-      ...card,
+      return reply.status(201).send({
+        card: toCardJson(created),
+      });
+    }
+  );
 
-      createdBy:
-        card.createdBy ?? null,
-
-      assignee:
-        card.assignee ?? null,
-
-      project: card.project
-        ? {
-            ...card.project,
-            price:
-              card.project.price.toString(),
-            startDate:
-              card.project.startDate
-                ? iso(card.project.startDate)
-                : "",
-            endDate:
-              card.project.endDate
-                ? iso(card.project.endDate)
-                : "",
-          }
-        : null,
-
-      startDate:
-        card.startDate
-          ? iso(card.startDate)
-          : null,
-
-      dueDate:
-        card.dueDate
-          ? iso(card.dueDate)
-          : null,
-
-      createdAt:
-        iso(card.createdAt),
-
-      updatedAt:
-        iso(card.updatedAt),
-
-      contentUpdateAt:
-        iso(card.contentUpdateAt),
-
-      order:
-        nextOrder,
-    };
-
-    app.io.to(`board:${card.boardId}`).emit("board:event", {
-      type: "card:created",
-      boardId: card.boardId,
-      card: payloadCard,
-      actorUserId: userId,
-      requestId,
-      updatedAt: new Date().toISOString(),
-    });
-
-    return reply.code(201).send({
-      card: payloadCard,
-    });
-  }
-);
-
-  //requireMyCard(app, (req: any) => req.params.cardId) 
   app.patch(
     "/card/:cardId",
     {
-      preHandler: [requireAuth],
+      preHandler: [requireAuth, requireMyCard(app)],
       schema: updateCardSchema,
     },
     async (req: any, reply) => {
-      const userId = req.user.sub as string;
       const cardId = req.params.cardId as string;
-      const requestId = req.headers["x-request-id"]
-        ? String(req.headers["x-request-id"])
-        : null;
 
       const body = req.body as {
         title?: string;
-        content?: string;
-        projectId?: string;
-        dueDate?: string;
+        content?: string | null;
+        projectId?: string | null;
+        parentCardId?: string | null;
+        assigneeUserId?: string | null;
+        startDate?: string | null;
+        dueDate?: string | null;
+        progress?: number;
         md?: number;
       };
 
       const existing = await app.prisma.card.findUnique({
         where: { cardId },
-        select: { cardId: true, boardId: true },
+        select: {
+          cardId: true,
+          boardId: true,
+          columnId: true,
+          startDate: true,
+          dueDate: true,
+        },
       });
+
       if (!existing) {
-        return reply.status(404).send({ code: "CARD_NOT_FOUND", message: "card not found" });
+        return reply.status(404).send({
+          code: "CARD_NOT_FOUND",
+          message: "card not found",
+        });
       }
 
-      const auth = await assertTeamMemberByBoard(app, userId, existing.boardId);
-      if (!auth.ok) {
-        return reply.status(auth.status).send({ code: auth.code, message: auth.message });
+      const board = await app.prisma.board.findUnique({
+        where: {
+          boardId: existing.boardId,
+        },
+        select: {
+          boardId: true,
+          teamId: true,
+        },
+      });
+
+      if (!board) {
+        return reply.status(404).send({
+          code: "BOARD_NOT_FOUND",
+          message: "board not found",
+        });
       }
-const data: any = {};
-let shouldUpdateContentAt = false;
 
-if (body.title !== undefined) {
-  const t = String(body.title ?? "").trim();
-  if (!t) {
-    return reply.status(400).send({ code: "TITLE_REQUIRED", message: "title required" });
-  }
-  data.title = t;
-  shouldUpdateContentAt = true;
-}
+      if (body.projectId !== undefined && body.projectId) {
+        const project = await app.prisma.project.findFirst({
+          where: {
+            projectId: body.projectId,
+            teamId: board.teamId,
+          },
+          select: {
+            projectId: true,
+          },
+        });
 
-if (body.content !== undefined) {
-  const c = String(body.content ?? "").trim();
-  data.content = c.length > 0 ? c : null;
-  shouldUpdateContentAt = true;
-}
+        if (!project) {
+          return reply.status(400).send({
+            code: "INVALID_PROJECT",
+            message: "project not found in this team",
+          });
+        }
+      }
 
-if (body.dueDate !== undefined) {
-  const s = String(body.dueDate ?? "").trim();
-  if (!s) {
-    data.dueDate = null;
-  } else {
-    const d = parseIsoDateOrNull(s);
-    if (!d) {
-      return reply.status(400).send({ code: "INVALID_DUEDATE", message: "invalid dueDate" });
-    }
-    data.dueDate = d;
-  }
-  shouldUpdateContentAt = true;
-}
+      if (body.assigneeUserId !== undefined && body.assigneeUserId) {
+        const assignee = await app.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: board.teamId,
+              userId: body.assigneeUserId,
+            },
+          },
+          select: {
+            userId: true,
+          },
+        });
 
-if (body.projectId !== undefined) {
-  const pid = String(body.projectId ?? "").trim();
+        if (!assignee) {
+          return reply.status(400).send({
+            code: "INVALID_ASSIGNEE",
+            message: "assignee is not a member of this team",
+          });
+        }
+      }
 
-  if (!pid) {
-    data.projectId = null;
-  } else {
-    const board = await app.prisma.board.findUnique({
-      where: { boardId: existing.boardId },
-      select: { teamId: true },
-    });
-    if (!board) {
-      return reply.status(404).send({ code: "BOARD_NOT_FOUND", message: "board not found" });
-    }
+      if (body.parentCardId !== undefined && body.parentCardId) {
+        if (body.parentCardId === cardId) {
+          return reply.status(400).send({
+            code: "INVALID_PARENT_CARD",
+            message: "card cannot be its own parent",
+          });
+        }
 
-    const project = await app.prisma.project.findUnique({
-      where: { projectId: pid },
-      select: { teamId: true },
-    });
-    if (!project) {
-      return reply.status(404).send({ code: "PROJECT_NOT_FOUND", message: "project not found" });
-    }
-    if (project.teamId !== board.teamId) {
-      return reply.status(400).send({ code: "INVALID_PROJECT", message: "project is not in the same team" });
-    }
+        const parent = await app.prisma.card.findFirst({
+          where: {
+            cardId: body.parentCardId,
+            boardId: board.boardId,
+          },
+          select: {
+            cardId: true,
+            parentCardId: true,
+          },
+        });
 
-    data.projectId = pid;
-  }
+        if (!parent) {
+          return reply.status(400).send({
+            code: "INVALID_PARENT_CARD",
+            message: "parent card not found in this board",
+          });
+        }
 
-  shouldUpdateContentAt = true;
-}
+        if (parent.parentCardId === cardId) {
+          return reply.status(400).send({
+            code: "INVALID_PARENT_CARD",
+            message: "circular parent relation is not allowed",
+          });
+        }
+      }
 
-if (body.md !== undefined) {
-  const md = Number(body.md);
-  if (!Number.isInteger(md) || md < 0) {
-    return reply.status(400).send({ code: "INVALID_MD", message: "invalid md period" });
-  }
-  data.md = md;
-  shouldUpdateContentAt = true;
-}
+      const nextStartDate =
+        body.startDate !== undefined
+          ? parseDateOrNull(body.startDate)
+          : existing.startDate;
 
-if (Object.keys(data).length === 0) {
-  return reply.status(400).send({ code: "NO_FIELDS", message: "no fields to update" });
-}
+      const nextDueDate =
+        body.dueDate !== undefined
+          ? parseDateOrNull(body.dueDate)
+          : existing.dueDate;
 
-data.updatedAt = new Date();
+      if (body.startDate && !nextStartDate) {
+        return reply.status(400).send({
+          code: "INVALID_STARTDATE",
+          message: "invalid startDate",
+        });
+      }
 
-if (shouldUpdateContentAt) {
-  data.contentUpdateAt = new Date();
-}
+      if (body.dueDate && !nextDueDate) {
+        return reply.status(400).send({
+          code: "INVALID_DUEDATE",
+          message: "invalid dueDate",
+        });
+      }
 
-      const card = await app.prisma.card.update({
+      if (
+        nextStartDate &&
+        nextDueDate &&
+        nextDueDate.getTime() < nextStartDate.getTime()
+      ) {
+        return reply.status(400).send({
+          code: "INVALID_DATE_RANGE",
+          message: "dueDate must be greater than or equal to startDate",
+        });
+      }
+
+      const data: any = {};
+
+      if (body.title !== undefined) {
+        const title = String(body.title ?? "").trim();
+
+        if (!title) {
+          return reply.status(400).send({
+            code: "TITLE_REQUIRED",
+            message: "title required",
+          });
+        }
+
+        data.title = title;
+      }
+
+      if (body.content !== undefined) {
+        data.content = sanitizeNullableString(body.content);
+        data.contentUpdateAt = new Date();
+      }
+
+      if (body.projectId !== undefined) {
+        data.projectId = sanitizeNullableString(body.projectId);
+      }
+
+      if (body.parentCardId !== undefined) {
+        data.parentCardId = sanitizeNullableString(body.parentCardId);
+      }
+
+      if (body.assigneeUserId !== undefined) {
+        data.assigneeUserId = sanitizeNullableString(body.assigneeUserId);
+      }
+
+      if (body.startDate !== undefined) {
+        data.startDate = nextStartDate;
+      }
+
+      if (body.dueDate !== undefined) {
+        data.dueDate = nextDueDate;
+      }
+
+      if (body.progress !== undefined) {
+        data.progress = sanitizeProgress(body.progress);
+      }
+
+      if (body.md !== undefined) {
+        data.md = sanitizeMd(body.md);
+      }
+
+      const updated = await app.prisma.card.update({
         where: { cardId },
         data,
-     select: {
-  cardId: true,
-  boardId: true,
-  columnId: true,
-  projectId: true,
-  parentCardId: true,
-  assigneeUserId: true,
-
-  title: true,
-  content: true,
-  startDate: true,
-  dueDate: true,
-  progress: true,
-  order: true,
-  md: true,
-
-  createdAt: true,
-  updatedAt: true,
-  contentUpdateAt: true,
-  createdByUserId: true,
-
-  createdBy: {
-    select: {
-      userId: true,
-      id: true,
-      name: true,
-    },
-  },
-
-  assignee: {
-    select: {
-      userId: true,
-      id: true,
-      name: true,
-    },
-  },
-
-  project: {
-    select: {
-      projectId: true,
-      teamId: true,
-      code: true,
-      name: true,
-      price: true,
-      startDate: true,
-      endDate: true,
-      colorCode: true,
-    },
-  },
-},
-      });
-
-      const payloadCard = {
-        ...card,
-        createdBy: card.createdBy ?? null,
-        project: card.project
-          ? {
-              ...card.project,
-              price: card.project.price.toString(),
-              startDate: card.project.startDate ? iso(card.project.startDate) : "",
-              endDate: card.project.endDate ? iso(card.project.endDate) : "",
-            }
-          : null,
-        dueDate: card.dueDate ? iso(card.dueDate) : null,
-        createdAt: iso(card.createdAt),
-        updatedAt: iso(card.updatedAt),
-      };
-
-      app.io.to(`board:${card.boardId}`).emit("board:event", {
-        type: "card:updated",
-        boardId: card.boardId,
-        card: payloadCard,
-        actorUserId: userId,
-        requestId,
-        updatedAt: new Date().toISOString(),
+        include: cardInclude(),
       });
 
       return reply.send({
-        card: payloadCard,
+        card: toCardJson(updated),
       });
     }
   );
 
-  //TODO 권한
-  // requireMyCard(app, (req: any) => req.params.cardId)
   app.delete(
     "/card/:cardId",
-    { preHandler: [requireAuth], schema: deleteCardSchema },
+    {
+      preHandler: [requireAuth, requireMyCard(app)],
+      schema: deleteCardSchema,
+    },
     async (req: any, reply) => {
-      const userId = req.user.sub as string;
       const cardId = req.params.cardId as string;
-      const requestId = req.headers["x-request-id"]
-        ? String(req.headers["x-request-id"])
-        : null;
 
-      const existing = await app.prisma.card.findUnique({
+      const childrenCount = await app.prisma.card.count({
+        where: {
+          parentCardId: cardId,
+        },
+      });
+
+      if (childrenCount > 0) {
+        return reply.status(400).send({
+          code: "CARD_HAS_CHILDREN",
+          message: "delete child cards first",
+        });
+      }
+
+      await app.prisma.card.delete({
         where: { cardId },
-        select: { cardId: true, boardId: true, columnId: true, order: true },
-      });
-      if (!existing) {
-        return reply.status(404).send({ code: "CARD_NOT_FOUND", message: "card not found" });
-      }
-
-      const auth = await assertTeamMemberByBoard(app, userId, existing.boardId);
-      if (!auth.ok) {
-        return reply
-          .status(auth.code === "FORBIDDEN" ? 403 : 404)
-          .send({ code: auth.code, message: auth.message });
-      }
-
-await app.prisma.$transaction(async (tx: any) => {
-  await tx.card.delete({ where: { cardId } });
-});
-
-
-
-      app.io.to(`board:${existing.boardId}`).emit("board:event", {
-        type: "card:deleted",
-        boardId: existing.boardId,
-        cardId,
-        columnId: existing.columnId,
-        actorUserId: userId,
-        requestId,
-        updatedAt: new Date().toISOString(),
       });
 
-      return reply.send({ ok: true });
+      return reply.send({
+        ok: true,
+      });
     }
   );
 
-app.patch( 
-  "/card/:cardId/move",
-  { preHandler: [requireAuth], schema: moveCardSchema },
-  async (req: any, reply) => {
-    const actorUserId = String(req.user?.sub ?? "");
-    const cardId = String(req.params.cardId ?? "");
-    const toColumnId = String(req.body?.toColumnId ?? "");
-    const toIndex = Number(req.body?.toIndex);
-    const requestId = req.headers["x-request-id"]
-      ? String(req.headers["x-request-id"])
-      : null;
+  app.patch(
+    "/card/:cardId/move",
+    {
+      preHandler: [requireAuth, requireMyCard(app)],
+      schema: moveCardSchema,
+    },
+    async (req: any, reply) => {
+      const cardId = req.params.cardId as string;
 
-    if (!cardId || !toColumnId || Number.isNaN(toIndex) || toIndex < 0) {
-      return reply.status(400).send({ code: "BAD_REQUEST" });
-    }
+      const body = req.body as {
+        toColumnId: string;
+        toIndex: number;
+      };
 
-    try {
-      const result = await app.prisma.$transaction(async (tx: any) => {
-        const card = await tx.card.findUnique({
-          where: { cardId },
-          select: {
-            cardId: true,
-            boardId: true,
-            columnId: true,
-            order: true,
-            updatedAt: true,
-          },
+      const toColumnId = String(body.toColumnId ?? "").trim();
+      const toIndex = Number(body.toIndex);
+
+      if (!toColumnId || !Number.isInteger(toIndex) || toIndex < 0) {
+        return reply.status(400).send({
+          code: "INVALID_MOVE",
+          message: "invalid move payload",
         });
+      }
 
-        if (!card) {
-          throw Object.assign(new Error("CARD_NOT_FOUND"), { statusCode: 404 });
-        }
-
-        const targetCol = await tx.column.findUnique({
-          where: { columnId: toColumnId },
-          select: { columnId: true, boardId: true },
-        });
-
-        if (!targetCol) {
-          throw Object.assign(new Error("COLUMN_NOT_FOUND"), { statusCode: 404 });
-        }
-
-        if (card.boardId !== targetCol.boardId) {
-          throw Object.assign(new Error("INVALID_MOVE"), { statusCode: 400 });
-        }
-
-        const boardId = card.boardId;
-        const fromColumnId = card.columnId;
-        const isSameColumn = fromColumnId === toColumnId;
-
-        const movedUpdatedAt = isSameColumn ? null : new Date();
-
-        const toCards = await tx.card.findMany({
-          where: { columnId: toColumnId },
-          orderBy: { order: "asc" },
-          select: { cardId: true, order: true },
-        });
-
-        const filtered = toCards.filter((c: any) => c.cardId !== cardId);
-        const idx = Math.max(0, Math.min(toIndex, filtered.length));
-
-        const prev = idx > 0 ? filtered[idx - 1] : null;
-        const next = idx < filtered.length ? filtered[idx] : null;
-
-        const newOrder = calcOrderForInsert(prev?.order ?? null, next?.order ?? null);
-
-        if (newOrder !== null) {
-          await tx.card.update({
-            where: { cardId },
-            data: {
-              columnId: toColumnId,
-              order: newOrder,
-              ...(movedUpdatedAt ? { updatedAt: movedUpdatedAt } : {}),
-            },
-          });
-        } else {
-          const rebased = [...filtered];
-          rebased.splice(idx, 0, { cardId, order: 0 });
-
-          // 1단계: unique 충돌 피하려고 임시 음수 order 부여
-          for (let i = 0; i < rebased.length; i++) {
-            await tx.card.update({
-              where: { cardId: rebased[i].cardId },
-              data: {
-                order: -1000000 - i,
-                ...(rebased[i].cardId === cardId
-                  ? {
-                      columnId: toColumnId,
-                      ...(movedUpdatedAt ? { updatedAt: movedUpdatedAt } : {}),
-                    }
-                  : {}),
-              },
-            });
-          }
-
-          // 2단계: 최종 order 부여
-          for (let i = 0; i < rebased.length; i++) {
-            await tx.card.update({
-              where: { cardId: rebased[i].cardId },
-              data: {
-                order: (i + 1) * 1024,
-              },
-            });
-          }
-        }
-
-        const movedCard = await tx.card.findUnique({
-          where: { cardId },
-          select: {
-            cardId: true,
-            boardId: true,
-            columnId: true,
-            order: true,
-            updatedAt: true,
-          },
-        });
-
-        if (!movedCard) {
-          throw Object.assign(new Error("CARD_NOT_FOUND"), { statusCode: 404 });
-        }
-
-        return {
-          boardId,
-          fromColumnId,
-          toColumnId,
-          toIndex: idx,
-          card: movedCard,
-        };
+      const card = await app.prisma.card.findUnique({
+        where: { cardId },
+        select: {
+          cardId: true,
+          boardId: true,
+          columnId: true,
+          order: true,
+        },
       });
 
-      app.io.to(`board:${result.boardId}`).emit("board:event", {
-        type: "card:moved",
-        boardId: result.boardId,
-        cardId: result.card.cardId,
-        fromColumnId: result.fromColumnId,
-        toColumnId: result.toColumnId,
-        toIndex: result.toIndex,
-        actorUserId,
-        requestId,
-        updatedAt: result.card.updatedAt.toISOString(),
+      if (!card) {
+        return reply.status(404).send({
+          code: "CARD_NOT_FOUND",
+          message: "card not found",
+        });
+      }
+
+      const toColumn = await app.prisma.column.findUnique({
+        where: { columnId: toColumnId },
+        select: {
+          columnId: true,
+          boardId: true,
+        },
+      });
+
+      if (!toColumn || toColumn.boardId !== card.boardId) {
+        return reply.status(400).send({
+          code: "INVALID_COLUMN",
+          message: "target column is invalid",
+        });
+      }
+
+      const cardsInTarget = await app.prisma.card.findMany({
+        where: {
+          columnId: toColumnId,
+          NOT: {
+            cardId,
+          },
+        },
+        orderBy: {
+          order: "asc",
+        },
+        select: {
+          cardId: true,
+          order: true,
+        },
+      });
+
+      const prevOrder =
+        toIndex <= 0
+          ? null
+          : cardsInTarget[toIndex - 1]?.order ?? null;
+
+      const nextOrder =
+        toIndex >= cardsInTarget.length
+          ? null
+          : cardsInTarget[toIndex]?.order ?? null;
+
+      let nextOrderValue = calcOrderForInsert(prevOrder, nextOrder);
+
+      if (nextOrderValue === null) {
+        await app.prisma.$transaction(
+          cardsInTarget.map((item, index) =>
+            app.prisma.card.update({
+              where: {
+                cardId: item.cardId,
+              },
+              data: {
+                order: index * 1024,
+              },
+            })
+          )
+        );
+
+        const refreshed = await app.prisma.card.findMany({
+          where: {
+            columnId: toColumnId,
+            NOT: {
+              cardId,
+            },
+          },
+          orderBy: {
+            order: "asc",
+          },
+          select: {
+            order: true,
+          },
+        });
+
+        const refreshedPrevOrder =
+          toIndex <= 0
+            ? null
+            : refreshed[toIndex - 1]?.order ?? null;
+
+        const refreshedNextOrder =
+          toIndex >= refreshed.length
+            ? null
+            : refreshed[toIndex]?.order ?? null;
+
+        nextOrderValue = calcOrderForInsert(
+          refreshedPrevOrder,
+          refreshedNextOrder
+        );
+      }
+
+      const updated = await app.prisma.card.update({
+        where: {
+          cardId,
+        },
+        data: {
+          columnId: toColumnId,
+          order: nextOrderValue ?? toIndex * 1024,
+        },
+        select: {
+          cardId: true,
+          boardId: true,
+          columnId: true,
+          order: true,
+          updatedAt: true,
+        },
       });
 
       return reply.send({
         ok: true,
         card: {
-          ...result.card,
-          updatedAt: result.card.updatedAt.toISOString(),
+          ...updated,
+          updatedAt: iso(updated.updatedAt),
         },
       });
-    } catch (e: any) {
-      const code = Number(e?.statusCode ?? 500);
-      return reply.status(code).send({
-        code: e?.message ?? "INTERNAL_SERVER_ERROR",
-        message: e?.message ?? "internal server error",
-      });
     }
-  }
-);
+  );
 };
 
 export default cardRoutes;
