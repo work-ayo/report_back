@@ -613,37 +613,63 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 
-  app.delete(
-    "/card/:cardId",
-    {
-      preHandler: [requireAuth, requireMyCard(app)],
-      schema: deleteCardSchema,
-    },
-    async (req: any, reply) => {
-      const cardId = req.params.cardId as string;
+app.delete(
+  "/card/:cardId",
+  {
+    preHandler: [requireAuth, requireMyCard(app)],
+    schema: deleteCardSchema,
+  },
+  async (req: any, reply) => {
+    const cardId = req.params.cardId as string;
 
-      const childrenCount = await app.prisma.card.count({
+    const target = await app.prisma.card.findUnique({
+      where: {
+        cardId,
+      },
+      select: {
+        cardId: true,
+        boardId: true,
+        parentCardId: true,
+      },
+    });
+
+    if (!target) {
+      return reply.status(404).send({
+        code: "CARD_NOT_FOUND",
+        message: "card not found",
+      });
+    }
+
+    await app.prisma.$transaction(async (tx) => {
+      /**
+       * 삭제 대상의 하위 작업들을
+       * 삭제 대상의 상위 작업으로 올려준다.
+       *
+       * 예:
+       * A > B > C 구조에서 B 삭제
+       * 결과: A > C
+       */
+      await tx.card.updateMany({
         where: {
           parentCardId: cardId,
         },
+        data: {
+          parentCardId: target.parentCardId,
+        },
       });
 
-      if (childrenCount > 0) {
-        return reply.status(400).send({
-          code: "CARD_HAS_CHILDREN",
-          message: "delete child cards first",
-        });
-      }
-
-      await app.prisma.card.delete({
-        where: { cardId },
+      await tx.card.delete({
+        where: {
+          cardId,
+        },
       });
+    });
 
-      return reply.send({
-        ok: true,
-      });
-    }
-  );
+    return reply.send({
+      ok: true,
+    });
+  }
+);
 
   app.patch(
     "/card/:cardId/move",
