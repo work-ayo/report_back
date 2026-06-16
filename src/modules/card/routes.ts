@@ -391,7 +391,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
   app.patch(
     "/card/:cardId",
     {
-      preHandler: [requireAuth, requireMyCard(app)],
+      preHandler: [requireAuth],
       schema: updateCardSchema,
     },
     async (req: any, reply) => {
@@ -408,6 +408,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
         progress?: number;
         md?: number;
       };
+
 
       const existing = await app.prisma.card.findUnique({
         where: { cardId },

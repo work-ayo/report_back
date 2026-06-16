@@ -135,6 +135,13 @@ const cardShape = {
 
     project:
       projectShape,
+assigneeUserId:
+      {
+        type: [
+          "string", 
+          "null",
+        ],
+      },
   },
 };
 
@@ -245,7 +252,6 @@ export const getBoardDetailSchema = {
           type: "object",
           additionalProperties: cardShape,
         },
-
         // cardIdsByColumnId: Record<string, string[]>
         cardIdsByColumnId: {
           type: "object",

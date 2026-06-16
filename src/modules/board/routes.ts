@@ -247,7 +247,7 @@ select: {
 
   createdAt: true,
   updatedAt: true,
-
+  assigneeUserId: true,
   project: true,
 
   startDate: true,
