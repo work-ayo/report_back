@@ -204,7 +204,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
       const content = sanitizeNullableString(body.content);
       const projectId = sanitizeNullableString(body.projectId);
       const parentCardId = sanitizeNullableString(body.parentCardId);
-      const assigneeUserId = sanitizeNullableString(body.assigneeUserId);
+      const assigneeUserId = userId;
       const md = sanitizeMd(body.md);
       const progress = sanitizeProgress(body.progress ?? body.md ?? 0);
 

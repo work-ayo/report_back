@@ -142,6 +142,7 @@ app.get(
           createdAt: true,
           updatedAt: true,
           project: true,
+          progress: true,
           createdBy: {
             select: {
               userId: true,
@@ -249,7 +250,7 @@ select: {
   updatedAt: true,
   assigneeUserId: true,
   project: true,
-
+  progress: true,
   startDate: true,
 
   contentUpdateAt: true,
@@ -280,23 +281,41 @@ select: {
         ]
       : cards;
 
-    const cardsById: Record<string, any> = {};
+const columnById = new Map(
+  columns.map((column: any) => [
+    column.columnId,
+    column,
+  ])
+);
 
-    for (const c of filteredCards) {
-      cardsById[c.cardId] = {
-        ...c,
-        parentCardId:
-  c.parentCardId,
-        startDate: c.startDate
-          ? c.startDate.toISOString()
-          : null,
-        dueDate: c.dueDate
-          ? c.dueDate.toISOString()
-          : null,
-        createdAt: c.createdAt.toISOString(),
-        updatedAt: c.updatedAt.toISOString(),
-      };
-    }
+const cardsById: Record<string, any> = {};
+
+for (const c of filteredCards) {
+  const column = columnById.get(c.columnId);
+
+  cardsById[c.cardId] = {
+    ...c,
+
+    columnName: column?.name ?? null,
+
+    parentCardId: c.parentCardId,
+
+    startDate: c.startDate
+      ? c.startDate.toISOString()
+      : null,
+
+    dueDate: c.dueDate
+      ? c.dueDate.toISOString()
+      : null,
+
+    createdAt: c.createdAt.toISOString(),
+    updatedAt: c.updatedAt.toISOString(),
+
+    contentUpdateAt: c.contentUpdateAt
+      ? c.contentUpdateAt.toISOString()
+      : null,
+  };
+}
 
     const cardIdsByColumnId: Record<string, string[]> =
       Object.create(null);

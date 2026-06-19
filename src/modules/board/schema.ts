@@ -132,7 +132,13 @@ const cardShape = {
     md: {
       type: "integer",
     },
-
+    
+    progress: {
+      type: "integer",
+    },
+    columnName:{
+      type: "string",
+    },
     project:
       projectShape,
 assigneeUserId:
