@@ -617,7 +617,7 @@ const cardRoutes: FastifyPluginAsync = async (app) => {
 app.delete(
   "/card/:cardId",
   {
-    preHandler: [requireAuth, requireMyCard(app)],
+    preHandler: [requireAuth],
     schema: deleteCardSchema,
   },
   async (req: any, reply) => {
@@ -675,7 +675,7 @@ app.delete(
   app.patch(
     "/card/:cardId/move",
     {
-      preHandler: [requireAuth, requireMyCard(app)],
+      preHandler: [requireAuth],
       schema: moveCardSchema,
     },
     async (req: any, reply) => {
@@ -718,6 +718,7 @@ app.delete(
         select: {
           columnId: true,
           boardId: true,
+          name:true,
         },
       });
 
@@ -800,23 +801,40 @@ app.delete(
           refreshedNextOrder
         );
       }
+const toColumnName = String(toColumn.name ?? "")
+  .trim()
+  .toUpperCase()
+  .replaceAll(" ", "_");
 
-      const updated = await app.prisma.card.update({
-        where: {
-          cardId,
-        },
-        data: {
-          columnId: toColumnId,
-          order: nextOrderValue ?? toIndex * 1024,
-        },
-        select: {
-          cardId: true,
-          boardId: true,
-          columnId: true,
-          order: true,
-          updatedAt: true,
-        },
-      });
+const isDoneColumn =
+  toColumnName === "DONE" ||
+  toColumnName === "COMPLETED"
+
+const updateData: any = {
+  columnId: toColumnId,
+  order: nextOrderValue ?? toIndex * 1024,
+};
+
+if (isDoneColumn) {
+  updateData.progress = 100;
+  updateData.md = 100;
+}
+
+const updated = await app.prisma.card.update({
+  where: {
+    cardId,
+  },
+  data: updateData,
+  select: {
+    cardId: true,
+    boardId: true,
+    columnId: true,
+    order: true,
+    progress: true,
+    md: true,
+    updatedAt: true,
+  },
+});
 
       return reply.send({
         ok: true,
